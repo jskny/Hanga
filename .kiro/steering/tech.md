@@ -66,7 +66,7 @@ CSHTMLテンプレート + モデル
 | `RazorLight` | 2.3.1 | Apache-2.0 | netcoreapp3.1 / netstandard2.0 / **net5.0** / net6.0 | ASP.NET Core MVC無しでRazorテンプレートを文字列に展開できる。net5.0向けの依存は `Microsoft.AspNetCore.Mvc.Razor.Extensions` 5.0.0 等で揃っている。最終リリースが2023年1月で、更新が止まっている点に注意 |
 | ASP.NET Core MVCのビュー描画機能(`IRazorViewEngine`) | (.NET 5 同梱) | MIT | net5.0 | 呼び出し元がASP.NET Coreアプリの場合、そのアプリのビューと同じ仕組みで展開できる。タグヘルパー・`~/` のパス解決・レイアウト・部分ビューなどMVCの機能がそのまま使える。呼び出し元がASP.NET Coreアプリであることが前提になる |
 
-【推奨・要確認】**ASP.NET Core MVCのビュー描画機能(`IRazorViewEngine`)を使い、RazorLightは採用しない。**
+**決定(2026年10月3日): ASP.NET Core MVCのビュー描画機能(`IRazorViewEngine`)を使い、RazorLightは採用しない。**
 
 - 利用部門から提示されたテンプレートの例は、ASP.NET Core MVCのビュー(`ViewData["Title"]` を設定し、`<html>`/`<head>` を持たず `_Layout.cshtml` と組み合わせる形)であった。
   Razor Pages の `@page` ディレクティブは使われていない。
@@ -74,6 +74,10 @@ CSHTMLテンプレート + モデル
   `ViewBag` に置き換えても、`_ViewStart.cshtml` が読まれない、`~/` のパスが解決されない、タグヘルパー(`asp-append-version` 等)が処理されない。
 - `IRazorViewEngine` では、同じビューと既定の形のレイアウトが、ASP.NET Core 5.0.17 上でアプリの画面と同じように展開され、PuppeteerSharp 18.1.0 でPDFにできた。
 - 検証の詳細は `docs/PDF出力方式検証レポート.md`「6. テンプレート展開方式の検証」。
+- 利用部門の回答(2026年10月3日): 呼び出し元アプリはコントローラーからビューを返す作りであり、この方式でよい。
+  本番は IIS の仮想ディレクトリを使わず、IIS から Kestrel へポートをリバースプロキシしている。
+- 使い方は「コントローラーのPDF用アクションから画面と同じビューをPDFにする」が主で、「バッチで一括生成する」は将来の候補。
+  どちらも検証済み(レポート「6.4 バッチ(HTTPリクエストの外)での生成」)。
 - この方式では、テンプレートは呼び出し元アプリの `Views` 配下のビューそのものになり、Hangaは「ビュー名とモデル」を受け取ってHTMLにする。
   Hangaは ASP.NET Core(`Microsoft.AspNetCore.App` 共有フレームワーク)を前提にする。呼び出し元はASP.NET Core 5アプリなので問題にならない。
   更新が止まっているRazorLightへの依存も無くなる。

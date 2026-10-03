@@ -17,7 +17,8 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
 
 - PDF出力はヘッドレスChromiumで行い、**`PuppeteerSharp` は 18.1.0 に固定**する(20以降は .NET 5 非対応の依存を連れてくるため)。
   `GoToAsync`(`Page.navigate`)は使わず `SetContentAsync` でHTMLを流し込む(18.1.0は新しいChromeで `GoToAsync` が失敗する)。根拠は `docs/PDF出力方式検証レポート.md`。
-- テンプレート展開は ASP.NET Core MVC のビュー描画機能(`IRazorViewEngine`)を使い、RazorLight は採用しない方向(推奨・要確認)。
+- テンプレート展開は ASP.NET Core MVC のビュー描画機能(`IRazorViewEngine`)を使い、RazorLight は採用しない(決定)。
+  主な使い方はコントローラーのPDF用アクションからの生成。バッチでの一括生成は将来の候補で、実現できることを検証済み。
   帳票テンプレートは呼び出し元アプリの既存ビューと同じ書き方(`ViewData`、`_Layout.cshtml`、`~/`、タグヘルパー)であり、RazorLight では扱えなかったため。
 - 本番サーバーは Windows Server(Docker不可)。Chromiumは運用部門がバージョンアップする前提で設計する。
 

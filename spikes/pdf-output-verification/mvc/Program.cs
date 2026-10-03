@@ -19,6 +19,14 @@ using PuppeteerSharp;
 
 namespace Mvc
 {
+    public sealed class NoopServer : Microsoft.AspNetCore.Hosting.Server.IServer
+    {
+        public Microsoft.AspNetCore.Http.Features.IFeatureCollection Features { get; } = new Microsoft.AspNetCore.Http.Features.FeatureCollection();
+        public Task StartAsync<TContext>(Microsoft.AspNetCore.Hosting.Server.IHttpApplication<TContext> application, System.Threading.CancellationToken cancellationToken) where TContext : notnull => Task.CompletedTask;
+        public Task StopAsync(System.Threading.CancellationToken cancellationToken) => Task.CompletedTask;
+        public void Dispose() { }
+    }
+
     public static class Program
     {
         public static string Chrome = "";
@@ -27,6 +35,11 @@ namespace Mvc
         public static void Main(string[] args)
         {
             Chrome = args[0];
+            if (args.Length > 1 && args[1] == "batch")
+            {
+                RunBatchAsync(args[2]).GetAwaiter().GetResult();
+                return;
+            }
             Host.CreateDefaultBuilder(args).ConfigureWebHostDefaults(w => w
                 .UseUrls("http://127.0.0.1:5078")
                 .ConfigureServices(s => s.AddControllersWithViews())
@@ -40,6 +53,37 @@ namespace Mvc
                         e.MapGet("/pdf", Pdf);
                     });
                 })).Build().Run();
+        }
+
+        // バッチ: Webサーバー(Kestrel)を起動せず、HTTPリクエストも無い状態で、同じビューからPDFを作る
+        private static async Task RunBatchAsync(string outputDir)
+        {
+            using var host = Host.CreateDefaultBuilder()
+                .ConfigureWebHostDefaults(w => w
+                    .ConfigureServices(s =>
+                    {
+                        s.AddControllersWithViews();
+                        // ポートを開かない「何もしないサーバー」に差し替える。ルーティングの登録などアプリの初期化だけを行わせる
+                        s.AddSingleton<Microsoft.AspNetCore.Hosting.Server.IServer, NoopServer>();
+                    })
+                    .Configure(app => { app.UseRouting(); app.UseEndpoints(e => e.MapDefaultControllerRoute()); }))
+                .Build();
+            await host.StartAsync();
+            Directory.CreateDirectory(outputDir);
+            for (int i = 1; i <= 3; i++)
+            {
+                using var scope = host.Services.CreateScope();
+                var http = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+                // エンドポイントルーティングでURLを生成させるため、ダミーのエンドポイントを設定する
+                http.SetEndpoint(new Endpoint(null, EndpointMetadataCollection.Empty, "hanga-batch"));
+                http.Request.Scheme = "https";
+                http.Request.Host = new HostString("hanga.invalid");
+                string path = Path.Combine(outputDir, "customer-" + i + ".pdf");
+                byte[] pdf = await RenderPdfAsync(http);
+                await File.WriteAllBytesAsync(path, pdf);
+                Console.WriteLine("batch: " + path + " " + pdf.Length + " bytes");
+            }
+            await host.StopAsync();
         }
 
         // コントローラーの外で、アプリ自身のビューエンジンを使ってビューをHTML文字列にする
@@ -61,6 +105,13 @@ namespace Mvc
         }
 
         private static async Task Pdf(HttpContext http)
+        {
+            var pdf = await RenderPdfAsync(http);
+            http.Response.ContentType = "application/pdf";
+            await http.Response.Body.WriteAsync(pdf, 0, pdf.Length);
+        }
+
+        private static async Task<byte[]> RenderPdfAsync(HttpContext http)
         {
             string html = await RenderViewAsync(http, "Home", "Index", null);
             Console.WriteLine("----- rendered html -----\n" + html + "\n-------------------------");
@@ -84,9 +135,7 @@ namespace Mvc
             string check = await page.EvaluateFunctionAsync<string>("() => getComputedStyle(document.querySelector('h1')).color + ' / ' + document.getElementById('js').textContent");
             Console.WriteLine("check: " + check);
             foreach (var p in problems) Console.WriteLine("PROBLEM " + p);
-            var pdf = await page.PdfDataAsync(new PdfOptions { Width = "210mm", Height = "297mm", PrintBackground = true });
-            http.Response.ContentType = "application/pdf";
-            await http.Response.Body.WriteAsync(pdf, 0, pdf.Length);
+            return await page.PdfDataAsync(new PdfOptions { Width = "210mm", Height = "297mm", PrintBackground = true });
         }
     }
 }
