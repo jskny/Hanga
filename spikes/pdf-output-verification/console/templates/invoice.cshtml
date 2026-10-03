@@ -1,0 +1,27 @@
+@model Poc.InvoiceModel
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>請求書 @Model.InvoiceNo</title>
+  <link rel="stylesheet" href="/css/report.css">
+  <script src="/js/report.js"></script>
+  <script src="https://cdn.example.com/blocked.js"></script>
+</head>
+<body>
+  <h1>請求書</h1>
+  <img class="logo" src="/img/logo.svg" alt="logo">
+  <p class="to">@Model.CustomerName</p>
+  <p>請求番号: @Model.InvoiceNo　<span class="danger">&lt;script&gt;のエスケープ確認: @("<b>太字にならない</b>")</span></p>
+  <table>
+    <thead><tr><th>品名</th><th>数量</th><th>単価</th><th>金額</th></tr></thead>
+    <tbody>
+    @foreach (var line in Model.Lines)
+    {
+      <tr><td>@line.Name</td><td class="num">@line.Quantity</td><td class="num money">@line.UnitPrice</td><td class="num money">@(line.UnitPrice * line.Quantity)</td></tr>
+    }
+    </tbody>
+  </table>
+  <p class="total">合計: <span id="total"></span></p>
+</body>
+</html>

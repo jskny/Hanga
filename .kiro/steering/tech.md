@@ -113,6 +113,15 @@ Chromium系の方式は、ライブラリ(PuppeteerSharp)とブラウザ(Chromiu
 - 読み込みに失敗したリソースがある場合は、崩れたPDFを黙って出力せず、例外にする。
 - 対応付けるフォルダの外のファイル(`../` を使ったパス等)は返さない。
 
+#### 検証結果(2026年10月3日)
+
+`docs/PDF出力方式検証レポート.md` を参照。要点:
+
+- PuppeteerSharp + RazorLight で、外部リソース・JavaScriptを反映したPDFを生成できた。
+- `Page.navigate` を使うと、古いPuppeteerSharpと新しいChromeの組み合わせで失敗する版があった。HTMLを `SetContentAsync` で流し込む方式では、2021〜2026年の7つの版すべてが Chrome 141 で動いた。
+- **PuppeteerSharp 20以降は、.NET 5 を公式にサポートしない依存パッケージ(`System.Text.Json` 8〜10、`Microsoft.Extensions.*` 8.0 等)を連れてくる。** 18.1.0以下にはこの問題がない。
+- 【要判断】採用する版(18.1.0固定/最新版/フォークして改修/最小限の自作)。レポート「5. 方向性の選択肢」を参照。
+
 #### 確定前に検証すること
 
 - PuppeteerSharp(`net5.0` から netstandard2.0 版を参照)で、Chromiumを起動してPDFを生成できるか。
