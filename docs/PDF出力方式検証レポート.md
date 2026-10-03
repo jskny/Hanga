@@ -105,6 +105,7 @@ setcontent 方式ではページのオリジンと仮想オリジンが異なる
 ### Hangaの設計への反映(提案)
 
 1. **HTMLは setcontent 方式で渡す**(`Page.navigate` を使わない)。外部リソースは `<base>` と仮想オリジン、リソース要求への介入で解決する。
+   → **その後、「8」の検証を受けて、ページ内のJavaScriptで仮想オリジンへ移動する方式に変更した**(`Page.navigate` を使わない点は同じ)。
 2. **用紙サイズはライブラリの定数(`PaperFormat.A4`)に頼らず、mm単位の数値(または CSS の `@page { size: A4 }` と `PreferCSSPageSize`)で明示する。**
 3. **PuppeteerSharpの版を上げるときも、ブラウザを上げるときと同じ検証手順(ページ数・文字列・画像化した見た目の比較)を通す。**
 
@@ -273,7 +274,44 @@ ASP.NET Core の列は、自己完結型で発行した ASP.NET Core 5.0.17 上�
 **未確認**: 異体字の字形が、指定どおりの異体字になっているかは確認できていない。IPAmj明朝を直接指定した表示でも、
 今回使った「葛」+U+E0100 と「葛」が同じ字形だったため、比較にならなかった。IPAmj明朝の文字情報一覧で異体字の字形が異なる組み合わせを選んで確認する。
 
-## 8. 未検証の事項
+## 8. サーバーへの非同期の値の取得
+
+検証日: 2026年10月3日
+検証コード: `spikes/pdf-output-verification/inproc/`
+
+利用部門の回答: ビューのJavaScriptが、相対パスのAPIへ非同期で値を取りに行く可能性がある。認証はCookie認証。
+
+### 8.1 検証の構成
+
+- ASP.NET Core 5.0.17 のアプリに、Cookie認証のログイン、ログインが必要なAPI(`/api/orders/{id}`)、
+  表示時に `fetch('/api/orders/123')` で値を取得して描画するビュー(`Views/Home/Order.cshtml` と `wwwroot/js/order.js`)を用意した。
+- ログインが必要なPDF用のエンドポイント(`/order/pdf`)が、ビューをHTMLにし、PuppeteerSharp 18.1.0 でPDFにして返す。
+- 仮想オリジン(`https://hanga.invalid/`)への要求は、すべてアプリ自身のミドルウェアのパイプラインにプロセス内で渡した。
+  パイプラインは `IStartupFilter` で捕まえ、要求ごとに `DefaultHttpContext` を作り、オペレーターの要求の `Cookie` ヘッダーを付けた。
+
+### 8.2 結果
+
+| 段階 | 結果 |
+|---|---|
+| 未ログインで `/order/pdf` | 302(ログイン画面へ)。PDF用アクション自体が認証で守られる |
+| ログイン済みで `/order/pdf`、HTMLを `SetContentAsync` で流し込む方式 | **×**。APIはアプリ内でオペレーターの権限で応答した(200)が、ブラウザ側の `fetch` が `Failed to fetch` で失敗した |
+| ログイン済みで `/order/pdf`、ページ内のJavaScriptで仮想オリジンへ移動する方式 | **○**。APIの値(注文番号・顧客・合計)がPDFに入った。Chrome 141・Chrome 154 の両方で確認 |
+
+- `SetContentAsync` 方式が失敗したのは、ページのオリジンが空白のページ(`about:blank`)のままで、`<base>` で向けた仮想オリジンへの `fetch` が
+  別オリジンへの要求とみなされ、CORS の制限を受けたため。
+- ページ内で `location.href = 'https://hanga.invalid/__hanga/report'` を実行して移動し、その要求に帳票のHTMLを返すと、ページのオリジンが仮想オリジンになり、
+  相対パスの `fetch` は同一オリジンの要求になった。CDPの `Page.navigate` 命令を使わないため、PuppeteerSharp 18.1.0 の `Invalid referrerPolicy` の問題も起きない。
+- 静的ファイル(`asp-append-version` のクエリ文字列付き)も、アプリの `UseStaticFiles` がそのまま応答した。フォルダへの対応付けを自前で持つ必要がなくなる。
+- ブラウザが自動で `favicon.ico` を要求し、アプリが404を返した。Hangaが応えて、失敗として扱わないようにする。
+
+### 8.3 設計への反映
+
+- 外部リソースの解決は「フォルダからファイルを返す」方式をやめ、**仮想オリジンへの要求をすべてアプリのパイプラインにプロセス内で渡す**方式にする(`.kiro/steering/tech.md`「外部リソースとサーバーへの要求の扱い」)。
+- ページのオリジンが仮想オリジンになるため、「2.2」で必要だったWebフォントの `Access-Control-Allow-Origin` も不要になる。
+- 要求ごとに作る `HttpContext` に何を引き継ぐか(`Cookie` 以外のヘッダー、`Host`、言語設定など)と、アプリのミドルウェアが仮の要求に対して想定外の動きをしないか
+  (HTTPSへのリダイレクト、Antiforgery、ログ出力など)は、設計時に確認する。
+
+## 9. 未検証の事項
 
 この開発環境はLinuxのため、次の点は Windows Server の検証環境で確認する必要がある。検証コードはそのまま使える(`spikes/pdf-output-verification/README.md`)。
 
@@ -285,5 +323,4 @@ ASP.NET Core の列は、自己完結型で発行した ASP.NET Core 5.0.17 上�
 - 同時に複数の帳票を生成した場合の性能と安定性。
 - Windows でのインストール済みフォントの名前での参照(`local('IPAmj明朝')`)。
 - 異体字が指定どおりの字形で描かれるか(「7. 外字・異体字の検証」)。
-- **ビューのJavaScriptが、サーバーへ非同期で値を取りに行く場合の扱い**(`fetch`・`XMLHttpRequest` 等)。
-  現在の方式は静的ファイルだけをフォルダから返すため、APIへの要求には応えられない。方式は未決(`.kiro/steering/tech.md`)。
+- 実際の画面のAPI呼び出し(`fetch` か `XMLHttpRequest` か jQuery か、POSTを使うか、Antiforgery のトークンを使うか)での動作。

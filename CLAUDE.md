@@ -16,12 +16,12 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
 **方針と未決事項**(`.kiro/steering/tech.md`「採用技術」):
 
 - PDF出力はヘッドレスChromiumで行い、**`PuppeteerSharp` は 18.1.0 に固定**する(20以降は .NET 5 非対応の依存を連れてくるため)。
-  `GoToAsync`(`Page.navigate`)は使わず `SetContentAsync` でHTMLを流し込む(18.1.0は新しいChromeで `GoToAsync` が失敗する)。根拠は `docs/PDF出力方式検証レポート.md`。
+  `GoToAsync`(`Page.navigate`)は使わない(18.1.0は新しいChromeで失敗する)。ページ内のJavaScriptで仮想オリジンへ移動し、
+  そこへの要求(静的ファイル・API)はすべてアプリ自身のパイプラインにプロセス内で渡す(オペレーターのCookieを引き継ぐ)。根拠は `docs/PDF出力方式検証レポート.md`。
 - テンプレート展開は ASP.NET Core MVC のビュー描画機能(`IRazorViewEngine`)を使い、RazorLight は採用しない(決定)。
   主な使い方はコントローラーのPDF用アクションからの生成。バッチでの一括生成は将来の候補で、実現できることを検証済み。
   帳票テンプレートは呼び出し元アプリの既存ビューと同じ書き方(`ViewData`、`_Layout.cshtml`、`~/`、タグヘルパー)であり、RazorLight では扱えなかったため。
 - 外字は、Hangaが外字用フォント(インストール済みのIPAmj明朝などを名前で参照)を注入して対応する。
-- 【未決】ビューのJavaScriptがサーバーから非同期で値を取得する場合の扱い(`.kiro/steering/tech.md`)。
 - 利用部門の回答で決まった要件の前提は `.kiro/steering/product.md`「要件の前提」。バッチでの一括生成は次回以降のセッションで要件に取り込む。
 - 本番サーバーは Windows Server(Docker不可)。Chromiumは運用部門がバージョンアップする前提で設計する。
 
