@@ -11,7 +11,11 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
 - `.kiro/specs/` — 未作成。中核機能の要件定義書・設計書・実装タスクリストをここに作る
 - `docs/開発環境メモ.md` — Claude Code on the web実行環境の注意点(.NET 5のビルド方法、日本語フォント、Chromium、`pkill -f`の自己マッチ問題など)
 
-**未決事項**: HTMLをPDFにする方式(`.kiro/steering/tech.md`「② PDF出力」)。決まるまでは、PDF出力方式に依存する実装・ドキュメントを確定させない。
+**方針と未決事項**(`.kiro/steering/tech.md`「採用技術」):
+
+- PDF出力はヘッドレスChromiumで行い、`PuppeteerSharp` を第一候補とする(帳票の見た目にJavaScriptが関わるため)。採用の確定は、同節「確定前に検証すること」の結果による。
+- テンプレート展開に `RazorLight` と ASP.NET Core MVC のビュー描画機能のどちらを使うかは未決。
+- 本番サーバーは Windows Server(Docker不可)。Chromiumは運用部門がバージョンアップする前提で設計する。
 
 実装中に環境起因と思われるエラーに遭遇したら、まず `docs/開発環境メモ.md` を確認する。
 

@@ -16,7 +16,7 @@ inclusion: always
         ↓
 テンプレート展開レイヤー (Templating)    CSHTML + モデル → HTML
         ↓
-PDF出力レイヤー (Rendering)            HTML → PDF
+PDF出力レイヤー (Rendering)            HTML → PDF(ヘッドレスChromium。外部リソースの解決を含む)
         ↓
 ファサード (Hanga)  ← 呼び出し元プロダクトが参照する唯一のアセンブリ
 ```
@@ -26,6 +26,8 @@ PDF出力レイヤー (Rendering)            HTML → PDF
 - 上位レイヤーは下位レイヤーの実装詳細(例: `RazorLight` の型、PDF出力ライブラリの型)を直接知ってはならない。
   レイヤー間の受け渡しは、各レイヤーが定義するインターフェースと内部モデル(POCO)を介する。
 - PDF出力レイヤーは `IPdfRenderer` のようなインターフェースの裏に実装を置き、出力方式を差し替えられるようにする。
+  Chromiumの操作に使うライブラリ(PuppeteerSharp)の型は、このレイヤーの外に出さない(`tech.md`「Chromiumのバージョンアップへの備え」)。
+- 外部リソース(スタイル・スクリプト・画像・フォント)の解決は、PDF出力レイヤーの責務とする。URLのパスとサーバー上のフォルダの対応付けは、ファサード経由で呼び出し元が設定する。
 - 呼び出し元プロダクトに見せる公開APIはファサード `Hanga` に集約する。依存ライブラリの型を公開APIに露出させない。
 
 ## ソリューション構成(予定)
@@ -35,7 +37,7 @@ Hanga/
 ├── src/
 │   ├── Hanga.Core/          # 例外階層・共通の値型
 │   ├── Hanga.Templating/    # CSHTMLテンプレートの展開(Razor)
-│   ├── Hanga.Rendering/     # HTML→PDF出力(方式は未決)
+│   ├── Hanga.Rendering/     # HTML→PDF出力(ヘッドレスChromium。PuppeteerSharpが第一候補)
 │   └── Hanga/               # ファサード(呼び出し元が参照する唯一のアセンブリ)
 ├── tests/
 │   └── Hanga.<レイヤー名>.Tests/   # レイヤーごとのユニットテスト
