@@ -166,7 +166,7 @@ Chromium系の方式は、ライブラリ(PuppeteerSharp)とブラウザ(Chromiu
 - 本番サーバーに配置するChromiumの種類(Google Chrome、Chrome for Testing、Microsoft Edge 等)と、運用部門の更新手順。
 - 1帳票あたりの生成時間・同時実行数(Chromiumのプロセスを使い回すか、帳票ごとに起動するか)。
 
-- 実際の帳票テンプレートでの動作(RazorLightで扱えないMVCの機能を使っていないか。下記「① テンプレート展開」の未決事項)。
+- 実際の帳票ビュー・レイアウト・API呼び出しでの動作(今回はサンプルのビューと、既定に近いレイアウト、検証用のAPIで確認した)。
 
 検証コードは `spikes/pdf-output-verification/` にあり、Windows Serverでもそのまま使える。結果は本節と `.kiro/specs/` の設計書に反映する。
 
