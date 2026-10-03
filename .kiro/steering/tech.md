@@ -72,13 +72,20 @@ CSHTMLテンプレート + モデル
 
 ### ② PDF出力(HTML → PDF)
 
-**方針: ヘッドレスChromiumでPDF化する方式とし、`PuppeteerSharp` を第一候補とする。**
-帳票の見た目にJavaScriptが関わるため、JavaScriptを実行できないHTML→PDF方式(HtmlRenderer.PdfSharp、自前のレイアウト + SkiaSharp)は採用できない。
-採用の確定は、下記「確定前に検証すること」の結果による。
+**決定(2026年10月3日): ヘッドレスChromiumでPDF化する方式とし、`PuppeteerSharp` 18.1.0 に固定して採用する。**
+
+- 帳票の見た目にJavaScriptが関わるため、JavaScriptを実行できないHTML→PDF方式(HtmlRenderer.PdfSharp、自前のレイアウト + SkiaSharp)は採用できない。
+- **18.1.0 に固定する理由**: PuppeteerSharp 20以降は、.NET 5 を公式にサポートしない依存パッケージ(`System.Text.Json` 8〜10、`Microsoft.Extensions.*` 8.0 等)を連れてきて、
+  呼び出し元のASP.NET Core 5アプリ全体の `Microsoft.Extensions.Logging`・`System.Text.Json` を置き換えてしまう。18.1.0 は、この問題がない最後の版である。
+  18.1.0 の依存は `Newtonsoft.Json` 13.0.1、`Microsoft.Extensions.Logging` 2.0.2、`Microsoft.Bcl.AsyncInterfaces` 1.1.0。
+- **18.1.0 では `Page.navigate`(`GoToAsync`)を使わない**: 新しいChrome(141・154で確認)が `Invalid referrerPolicy` で拒否する。HTMLは `SetContentAsync` で流し込み、相対URLは `<base>` で仮想オリジンに向ける。
+- **版を上げない**: 18.1.0 から版を変える場合(上げる・フォークして改修する・必要な部分を自作する)は、本節を更新してから行う。
+  将来のChromeで動かなくなった場合の対応方針は `docs/PDF出力方式検証レポート.md`「5. 方向性の選択肢」のC案(フォークして修正)・D案(必要な部分を自作)とする。
+- 検証の詳細は `docs/PDF出力方式検証レポート.md` を参照。
 
 | 候補 | 版 | ライセンス | 対象フレームワーク | 方式・特徴 | 評価 |
 |---|---|---|---|---|---|
-| `PuppeteerSharp` | 25.12.0 | MIT | netstandard2.0 / net8.0 / net10.0 | ヘッドレスChromiumを子プロセスとして起動し、Chrome DevTools Protocolで操作してPDFに印刷する | **第一候補**。.NETだけで完結し、Node.jsのドライバが不要 |
+| `PuppeteerSharp` | **18.1.0**(最新は25.12.0) | MIT | netstandard2.0(18.1.0) | ヘッドレスChromiumを子プロセスとして起動し、Chrome DevTools Protocolで操作してPDFに印刷する | **採用**。.NETだけで完結し、Node.jsのドライバが不要 |
 | `Microsoft.Playwright` | 1.63.0 | MIT | netstandard2.0 | 方式は同上。加えてNode.jsベースのドライバを同梱する | 次点。ライブラリの版ごとに対応するブラウザの版が決まっており、運用部門によるChromiumのバージョンアップとの相性を懸念する(過去に、ブラウザの自動更新で自動テストが動かなくなった経験がある) |
 | `HtmlRenderer.PdfSharp` | 1.6.1 | BSD-3-Clause | netstandard2.0 / net8.0 | HTMLを自前で解釈して `PDFsharp`(MIT)で描画する | 不採用。JavaScriptを実行できない。CSSもHTML 4/CSS 2程度 |
 | 自前のレイアウト + `SkiaSharp` | (Utsushiは2.88.8) | MIT | netstandard2.0 ほか | 対応するHTML/CSSのサブセットを自分で実装する | 不採用。JavaScriptを実行できない |
@@ -93,12 +100,14 @@ CSHTMLテンプレート + モデル
 Chromium系の方式は、ライブラリ(PuppeteerSharp)とブラウザ(Chromium)の組み合わせが動作確認済みの範囲を外れると、
 起動できない・命令が失敗する・見た目が変わる、といった問題が起きうる。運用部門がChromiumを上げる前提のため、Hangaは次の方針をとる。
 
-1. **使う機能を最小限にし、Hangaの内側に閉じ込める**: 起動、HTMLの読み込み、リソース要求への介入、読み込み完了の待機、PDFへの印刷に限る。
-   呼び出し元にPuppeteerSharpの型を見せない。壊れた場合の修正をHangaの中だけで完結させるため。
-2. **Chromiumの場所は設定で指定する**: 実行ファイルのパスを呼び出し元の設定で渡す。Hangaが実行時にブラウザをダウンロードすることはしない。
-3. **原因の分かる失敗にする**: 起動・生成に失敗した場合は、Chromiumの版と失敗した段階が分かる例外を出す。
-4. **バージョンアップ前の検証手順を提供する**: サンプル帳票のPDFを生成し、ページ数・含まれる文字列・画像化した見た目を前回の結果と比較する手順(ツール)を用意する。
-   運用部門には、本番に適用する前に検証環境で実行してもらう運用とする。
+1. **使う機能を最小限にし、Hangaの内側に閉じ込める**: 起動、HTMLの流し込み(`SetContentAsync`)、リソース要求への介入、読み込み完了の待機、PDFへの印刷に限る。
+   `Page.navigate`(`GoToAsync`)は使わない。呼び出し元にPuppeteerSharpの型を見せない。
+   壊れた場合の修正(PuppeteerSharpのフォークへの差し替えや、必要な部分の自作を含む)をHangaの中だけで完結させるため。
+2. **用紙サイズはライブラリの定数に頼らない**: `PaperFormat.A4` 等の定義はPuppeteerSharpの版によって異なる(18.1.0以前と20以降で高さが約1pt違う)。mm単位の数値またはCSSの `@page` で明示する。
+3. **Chromiumの場所は設定で指定する**: 実行ファイルのパスを呼び出し元の設定で渡す。Hangaが実行時にブラウザをダウンロードすることはしない。
+4. **原因の分かる失敗にする**: 起動・生成に失敗した場合は、Chromiumの版と失敗した段階が分かる例外を出す。
+5. **バージョンアップ前の検証手順を提供する**: サンプル帳票のPDFを生成し、ページ数・含まれる文字列・画像化した見た目を前回の結果と比較する手順(ツール)を用意する。
+   運用部門には、本番に適用する前に検証環境で実行してもらう運用とする。Hanga側でPuppeteerSharpを差し替える場合も同じ手順を通す。
 
 #### 外部リソース(スタイル・スクリプト・画像・フォント)の扱い
 
@@ -120,20 +129,20 @@ Chromium系の方式は、ライブラリ(PuppeteerSharp)とブラウザ(Chromiu
 - PuppeteerSharp + RazorLight で、外部リソース・JavaScriptを反映したPDFを生成できた。
 - `Page.navigate` を使うと、古いPuppeteerSharpと新しいChromeの組み合わせで失敗する版があった。HTMLを `SetContentAsync` で流し込む方式では、2021〜2026年の7つの版すべてが Chrome 141 で動いた。
 - **PuppeteerSharp 20以降は、.NET 5 を公式にサポートしない依存パッケージ(`System.Text.Json` 8〜10、`Microsoft.Extensions.*` 8.0 等)を連れてくる。** 18.1.0以下にはこの問題がない。
-- 【要判断】採用する版(18.1.0固定/最新版/フォークして改修/最小限の自作)。レポート「5. 方向性の選択肢」を参照。
+- Chrome 154(検証時点で入手できた最も新しい版)でも、18.1.0 + `SetContentAsync` 方式で動き、Chrome 141 と出力が一致した。
+- 上記を踏まえ、18.1.0 に固定して採用することを決定した(本節冒頭)。
 
-#### 確定前に検証すること
+#### 未検証の事項(Windows Server の検証環境で確認する)
 
-- PuppeteerSharp(`net5.0` から netstandard2.0 版を参照)で、Chromiumを起動してPDFを生成できるか。
-- **ライブラリとブラウザの版のずれへの耐性**: 古い版のPuppeteerSharpで新しいChromiumを操作し、PDFを生成できるか。版の差をいくつか変えて試す。
-- リソース要求への介入でフォルダのファイルを返す方式で、外部CSS・スクリプト・Webフォントが反映されるか。
-- 日本語のPDFで、フォントが埋め込まれ、文字列の検索・コピーができるか(`pdffonts` で `Type 3` にならないか)。
+- Visual Studio 2019 の実機でのビルド(MSBuild 16.11 / NuGet 5.11 での復元を含む)と、Windows上の .NET 5 ランタイムでの動作。
 - Windows Server上で、呼び出し元アプリの実行ユーザー(IISのアプリケーションプールのID等)からChromiumを起動できるか(サンドボックス、プロファイル用の一時フォルダの書き込み権限)。
   この開発環境はLinuxのため、Windows固有の点は検証環境での確認が必要。
 - 本番サーバーに配置するChromiumの種類(Google Chrome、Chrome for Testing、Microsoft Edge 等)と、運用部門の更新手順。
 - 1帳票あたりの生成時間・同時実行数(Chromiumのプロセスを使い回すか、帳票ごとに起動するか)。
 
-選定の結果は本節に記録し、`.kiro/specs/` の設計書にも反映する。
+- 実際の帳票テンプレートでの動作(RazorLightで扱えないMVCの機能を使っていないか。下記「① テンプレート展開」の未決事項)。
+
+検証コードは `spikes/pdf-output-verification/` にあり、Windows Serverでもそのまま使える。結果は本節と `.kiro/specs/` の設計書に反映する。
 
 ## 開発コマンド
 

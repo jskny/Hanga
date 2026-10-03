@@ -154,7 +154,9 @@ ASP.NET Core 5.0.17 のアプリに PuppeteerSharp 25.12.0 を組み込んで実
   Hangaの利用手順(`docs/ライブラリの使い方.md` を作るとき)に必ず書く。
 - 最終リリースは2023年1月で、更新が止まっている(`.kiro/steering/tech.md`)。
 
-## 5. 方向性の選択肢(要判断)
+## 5. 方向性の選択肢
+
+> **決定(2026年10月3日)**: A案(PuppeteerSharp 18.1.0 に固定)を採用した。`.kiro/steering/tech.md`「② PDF出力」に反映済み。
 
 PuppeteerSharpの版について、次の選択肢がある。
 

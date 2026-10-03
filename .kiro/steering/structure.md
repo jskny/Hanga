@@ -37,7 +37,7 @@ Hanga/
 ├── src/
 │   ├── Hanga.Core/          # 例外階層・共通の値型
 │   ├── Hanga.Templating/    # CSHTMLテンプレートの展開(Razor)
-│   ├── Hanga.Rendering/     # HTML→PDF出力(ヘッドレスChromium。PuppeteerSharpが第一候補)
+│   ├── Hanga.Rendering/     # HTML→PDF出力(ヘッドレスChromium。PuppeteerSharp 18.1.0)
 │   └── Hanga/               # ファサード(呼び出し元が参照する唯一のアセンブリ)
 ├── tests/
 │   └── Hanga.<レイヤー名>.Tests/   # レイヤーごとのユニットテスト

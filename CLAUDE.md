@@ -5,15 +5,18 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
 
 ## 現在の状態
 
-実装には未着手。方針(`.kiro/steering/`)と開発環境メモ(`docs/開発環境メモ.md`)のみがある。
+実装には未着手。方針(`.kiro/steering/`)、PDF出力方式の検証結果、開発環境メモがある。
 
 - `.kiro/steering/` — 常時適用される方針(製品概要・技術方針・プロジェクト構成)
 - `.kiro/specs/` — 未作成。中核機能の要件定義書・設計書・実装タスクリストをここに作る
+- `docs/PDF出力方式検証レポート.md` — PuppeteerSharp + RazorLight の検証結果(版のずれへの耐性、.NET 5 / VS2019 への対応状況)
+- `spikes/pdf-output-verification/` — 上記の検証コード(製品コードではない。`Hanga.sln` に含めない)
 - `docs/開発環境メモ.md` — Claude Code on the web実行環境の注意点(.NET 5のビルド方法、日本語フォント、Chromium、`pkill -f`の自己マッチ問題など)
 
 **方針と未決事項**(`.kiro/steering/tech.md`「採用技術」):
 
-- PDF出力はヘッドレスChromiumで行い、`PuppeteerSharp` を第一候補とする(帳票の見た目にJavaScriptが関わるため)。採用の確定は、同節「確定前に検証すること」の結果による。
+- PDF出力はヘッドレスChromiumで行い、**`PuppeteerSharp` は 18.1.0 に固定**する(20以降は .NET 5 非対応の依存を連れてくるため)。
+  `GoToAsync`(`Page.navigate`)は使わず `SetContentAsync` でHTMLを流し込む(18.1.0は新しいChromeで `GoToAsync` が失敗する)。根拠は `docs/PDF出力方式検証レポート.md`。
 - テンプレート展開に `RazorLight` と ASP.NET Core MVC のビュー描画機能のどちらを使うかは未決。
 - 本番サーバーは Windows Server(Docker不可)。Chromiumは運用部門がバージョンアップする前提で設計する。
 
