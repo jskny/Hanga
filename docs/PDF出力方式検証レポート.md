@@ -1,4 +1,4 @@
-# PDF出力方式検証レポート(PuppeteerSharp + RazorLight)
+# PDF出力方式検証レポート(PuppeteerSharp・テンプレート展開方式)
 
 検証日: 2026年10月3日
 検証環境: Claude Code on the web(Ubuntu 24.04、Linux)。Windows Server での確認は行っていない(「未検証の事項」参照)
@@ -171,7 +171,55 @@ PuppeteerSharpの版について、次の選択肢がある。
 将来Chromeの更新で動かなくなった場合に、C(フォークして修正)またはD(自作)へ切り替えられるようにするためである。
 B は、呼び出し元アプリ全体の依存を変えるため、呼び出し元の開発チームと合意できない限り採らない。
 
-## 6. 未検証の事項
+## 6. テンプレート展開方式の検証(RazorLight / ASP.NET Core MVC のビュー描画)
+
+検証日: 2026年10月3日
+検証コード: `spikes/pdf-output-verification/razorlight-mvc-view/`(RazorLight)、`spikes/pdf-output-verification/mvc/`(ASP.NET Core MVC)
+
+### 6.1 検証に使ったビュー
+
+利用部門から提示されたテンプレートの例(`Views/Home/Index.cshtml`)をそのまま使った。
+
+```cshtml
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<h1>Hello, World!</h1>
+<p>これは MVC ビューの Hello World 画面です。</p>
+```
+
+この例は `<html>`/`<head>` を持たないため、`_ViewStart.cshtml`(`Layout = "_Layout"`)と、
+`dotnet new mvc` の既定に近い `_Layout.cshtml` を補った。レイアウトは `~/css/site.css`・`~/js/site.js` を `asp-append-version="true"` 付きで読み込み、
+フッターにタグヘルパーのリンク(`asp-controller`/`asp-action`)を持つ。`site.js` はDOMに要素を追加する(見た目に関わるJavaScriptの例)。
+
+### 6.2 結果
+
+| 確認項目 | RazorLight 2.3.1 | ASP.NET Core 5 の `IRazorViewEngine` |
+|---|---|---|
+| 提示されたビューをそのままコンパイルできる | **×**(`The name 'ViewData' does not exist in the current context`) | ○ |
+| `_ViewStart.cshtml` によるレイアウトの自動適用 | ×(ビュー側に `Layout` の明示が必要) | ○ |
+| `ViewData["Title"]` がレイアウトの `<title>` に入る | ×(`ViewBag` への書き換えが必要) | ○ |
+| `~/css/site.css` のパス解決 | ×(`~/` のまま出力) | ○(`/css/site.css`) |
+| タグヘルパー(`asp-append-version`、`asp-controller` 等) | ×(属性のまま出力) | ○(`?v=<ハッシュ>` の付与、`href="/Home/Privacy"`) |
+| 外部CSS・JavaScriptを反映したPDF(PuppeteerSharp 18.1.0、setcontent 方式) | (未実施) | ○(見出しの色、`site.js` が追加した要素がPDFに出た) |
+
+RazorLight の列の2行目以降は、`ViewData` を `ViewBag` に置き換え、レイアウトを明示して確認した。
+ASP.NET Core の列は、自己完結型で発行した ASP.NET Core 5.0.17 上で確認した。
+
+### 6.3 わかったこと・設計への反映
+
+- **RazorLightは、MVCのビューとして書かれたテンプレートを扱えない。** 帳票ごとにRazorLight向けの書き方(`ViewBag`、レイアウトの明示、`~/` やタグヘルパーを使わない)を強いることになる。
+- **ASP.NET Core MVC のビュー描画機能なら、アプリの画面と同じ書き方のビューをそのままHTMLにできる。** RazorLightへの依存(2023年1月以降更新が止まっている)も不要になる。
+- コントローラーの外からビューを描画するには、`HttpContext`(`RequestServices` を含む)、`RouteData`(`controller` の値でビューの探索場所が決まる)、
+  `ITempDataProvider` が必要だった。HTTPリクエストの処理中でない場所(バックグラウンド処理など)から呼ぶ場合の作り方は、設計書で決める。
+- タグヘルパーが出力するURLは、アプリのパスベース(IISの仮想ディレクトリ配下に置いた場合の `/アプリ名` など)を含む。
+  リソース要求をフォルダに対応付けるときは、パスベースを取り除く必要がある(設計書で扱う)。
+- `asp-append-version` が付けるクエリ文字列(`?v=...`)は、フォルダへの対応付けでは無視してよい(検証コードでも無視した)。
+- 用紙サイズを `Width = "210mm"`・`Height = "297mm"` で指定すると、PDFのページは 595.92 × 841.92pt になった(`PaperFormat.A4` の 18.1.0 での値 595.92 × 842.88pt とは異なる)。
+  Chromiumの内部で丸めが入るため、mm指定でも正確なA4(595.28 × 841.89pt)にはならない。指定方法と許容範囲は設計書で決める。
+
+## 7. 未検証の事項
 
 この開発環境はLinuxのため、次の点は Windows Server の検証環境で確認する必要がある。検証コードはそのまま使える(`spikes/pdf-output-verification/README.md`)。
 
@@ -179,5 +227,5 @@ B は、呼び出し元アプリ全体の依存を変えるため、呼び出し
 - **Windows上の .NET 5 ランタイムでの動作**。
 - **IISのアプリケーションプールのユーザーからのChromium起動**。検証コードは root で動かすため `--no-sandbox` を付けている。Windowsではサンドボックスを有効にしたまま起動できるかを確認する。
 - 本番に置くChromium(Google Chrome / Chrome for Testing / Microsoft Edge 等)での動作。
-- 実際の帳票テンプレート(呼び出し元アプリの既存ビュー)での動作。特に、`~/` で始まるパスやタグヘルパーなど、RazorLightが対応しないMVCの機能を使っていないか。
+- 実際の帳票テンプレート(呼び出し元アプリの既存ビュー)とレイアウトでの動作。今回は提示された例と、既定の形に近いレイアウトで確認した。
 - 同時に複数の帳票を生成した場合の性能と安定性。

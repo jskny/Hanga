@@ -6,6 +6,9 @@ Windows Server の検証環境で同じ確認をするときにも使う。
 - `console/` — CSHTML(RazorLight)→ HTML → PDF(PuppeteerSharp)を1回実行するコンソールアプリ。
   外部CSS・JavaScript・Webフォント・画像をリソース要求への介入で `wwwroot` から返し、それ以外の通信は遮断する。
 - `web/` — ASP.NET Core 5 アプリの中で同じ処理を動かす確認用。`GET /pdf` でPDFを返す。
+- `mvc/` — ASP.NET Core 5 アプリ自身のビュー描画機能(`IRazorViewEngine`)で `Views/Home/Index.cshtml`(レイアウト・`~/`・タグヘルパーを含む)をHTMLにし、
+  PuppeteerSharp 18.1.0 でPDFにする。`GET /pdf` でPDFを返す。実行例: `dotnet run -- <chromeの実行ファイル>`
+- `razorlight-mvc-view/` — 上記と同じ `Views` を RazorLight で展開してみる確認用。実行例: `dotnet run -- ../mvc/Views`
 
 ## 準備
 

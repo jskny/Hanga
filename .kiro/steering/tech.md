@@ -66,9 +66,17 @@ CSHTMLテンプレート + モデル
 | `RazorLight` | 2.3.1 | Apache-2.0 | netcoreapp3.1 / netstandard2.0 / **net5.0** / net6.0 | ASP.NET Core MVC無しでRazorテンプレートを文字列に展開できる。net5.0向けの依存は `Microsoft.AspNetCore.Mvc.Razor.Extensions` 5.0.0 等で揃っている。最終リリースが2023年1月で、更新が止まっている点に注意 |
 | ASP.NET Core MVCのビュー描画機能(`IRazorViewEngine`) | (.NET 5 同梱) | MIT | net5.0 | 呼び出し元がASP.NET Coreアプリの場合、そのアプリのビューと同じ仕組みで展開できる。タグヘルパー・`~/` のパス解決・レイアウト・部分ビューなどMVCの機能がそのまま使える。呼び出し元がASP.NET Coreアプリであることが前提になる |
 
-【未決】どちらにするかは、帳票テンプレートが ASP.NET Core MVC の機能(タグヘルパー、`~/` で始まるパス、`@Html`/`@Url` ヘルパー、
-`_Layout.cshtml` などのレイアウト・部分ビュー)をどこまで使うかで決まる。RazorLightはこれらの多くを持たない。
-帳票テンプレートが呼び出し元アプリの既存ビューと同じ書き方をする場合は、`IRazorViewEngine` 側が有力になる。
+【推奨・要確認】**ASP.NET Core MVCのビュー描画機能(`IRazorViewEngine`)を使い、RazorLightは採用しない。**
+
+- 利用部門から提示されたテンプレートの例は、ASP.NET Core MVCのビュー(`ViewData["Title"]` を設定し、`<html>`/`<head>` を持たず `_Layout.cshtml` と組み合わせる形)であった。
+  Razor Pages の `@page` ディレクティブは使われていない。
+- RazorLight 2.3.1 では、この例が `The name 'ViewData' does not exist in the current context` でコンパイルできなかった。
+  `ViewBag` に置き換えても、`_ViewStart.cshtml` が読まれない、`~/` のパスが解決されない、タグヘルパー(`asp-append-version` 等)が処理されない。
+- `IRazorViewEngine` では、同じビューと既定の形のレイアウトが、ASP.NET Core 5.0.17 上でアプリの画面と同じように展開され、PuppeteerSharp 18.1.0 でPDFにできた。
+- 検証の詳細は `docs/PDF出力方式検証レポート.md`「6. テンプレート展開方式の検証」。
+- この方式では、テンプレートは呼び出し元アプリの `Views` 配下のビューそのものになり、Hangaは「ビュー名とモデル」を受け取ってHTMLにする。
+  Hangaは ASP.NET Core(`Microsoft.AspNetCore.App` 共有フレームワーク)を前提にする。呼び出し元はASP.NET Core 5アプリなので問題にならない。
+  更新が止まっているRazorLightへの依存も無くなる。
 
 ### ② PDF出力(HTML → PDF)
 

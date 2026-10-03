@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - Sample</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header><span class="brand">Sample</span></header>
+    <main role="main">
+        @RenderBody()
+    </main>
+    <footer>&copy; Sample - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a></footer>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
