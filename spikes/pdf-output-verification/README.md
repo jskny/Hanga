@@ -33,6 +33,8 @@ dotnet build -c Release --no-incremental -p:Vs2019Compiler=true -p:PuppeteerVers
 dotnet publish -c Release -r linux-x64 --self-contained true -p:PuppeteerVersion=18.1.0 -o sc/18.1.0
 ```
 
+- 外字用フォントの注入を試すときは、環境変数 `HANGA_GAIJI_FONT=<外字用フォントのファイル>` を付けて setcontent 方式で実行する。
+  さらに `HANGA_GAIJI_SRC=local` を付けると、ファイルを転送せず、インストール済みの IPAmj明朝 を名前で参照する。
 - この開発環境(Linux)の Chromium は `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`(Chrome 141)。
 - コードは Linux のコンテナで root として動かすため `--no-sandbox` を付けている。Windows Server では外して試し、
   起動できない場合はその旨を記録すること(`docs/PDF出力方式検証レポート.md`「未検証の事項」)。

@@ -79,6 +79,12 @@ namespace Poc
                         await req.AbortAsync();
                         return;
                     }
+                    if (uri.AbsolutePath == "/__hanga/gaiji.ttf" && Environment.GetEnvironmentVariable("HANGA_GAIJI_FONT") is string gaiji)
+                    {
+                        served.Add("__hanga/gaiji.ttf");
+                        await req.RespondAsync(new ResponseData { Status = HttpStatusCode.OK, ContentType = "font/ttf", BodyData = File.ReadAllBytes(gaiji), Headers = new Dictionary<string, object> { ["Access-Control-Allow-Origin"] = "*" } });
+                        return;
+                    }
                     if (uri.AbsolutePath == "/__report")
                     {
                         await req.RespondAsync(new ResponseData { Status = HttpStatusCode.OK, ContentType = "text/html; charset=utf-8", Body = html });
@@ -107,7 +113,26 @@ namespace Poc
             if (mode == "setcontent")
             {
                 // Page.navigate を使わず、<base> で相対URLの基準を仮想オリジンに向けてからHTMLを流し込む
-                string withBase = html.Replace("<head>", "<head><base href=\"" + Origin + "/\">");
+                string inject = "<base href=\"" + Origin + "/\">";
+                if (Environment.GetEnvironmentVariable("HANGA_GAIJI_FONT") != null)
+                {
+                    // 外字用フォント。HANGA_GAIJI_SRC=local なら、サーバーにインストール済みのフォントを名前で参照する(ファイルを転送しない)
+                    string src = Environment.GetEnvironmentVariable("HANGA_GAIJI_SRC") == "local"
+                        ? "local('IPAmj明朝'),local('IPAmjMincho')"
+                        : "url('/__hanga/gaiji.ttf') format('truetype')";
+                    // unicode-range で、通常のフォントに無いことが多い範囲(CJK拡張B以降・私用領域)だけに使わせる。該当する文字が無いページではフォントを読み込まない
+                    inject += "<style>@font-face{font-family:'HangaGaiji';src:" + src + ";unicode-range:U+20000-3134F,U+E000-F8FF,U+F0000-10FFFF;}"
+                        + "@font-face{font-family:'HangaGaijiIvs';src:" + src + ";}"
+                        + ".hanga-ivs{font-family:'HangaGaijiIvs' !important;}</style>"
+                        + "<script>document.addEventListener('DOMContentLoaded',function(){"
+                        // 異体字セレクタ付きの文字(基底文字+U+E0100〜E01EF)を、外字用フォントで描く span で包む
+                        + "var re=/[\\s\\S](?:\\uDB40[\\uDD00-\\uDDEF])/g;var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT),n,list=[];while(n=w.nextNode()){if(re.test(n.nodeValue))list.push(n);re.lastIndex=0;}"
+                        + "list.forEach(function(t){var f=document.createDocumentFragment(),s=t.nodeValue,i=0,m;re.lastIndex=0;while(m=re.exec(s)){f.appendChild(document.createTextNode(s.slice(i,m.index)));var sp=document.createElement('span');sp.className='hanga-ivs';sp.textContent=m[0];f.appendChild(sp);i=m.index+m[0].length;}f.appendChild(document.createTextNode(s.slice(i)));t.parentNode.replaceChild(f,t);});"
+                        // 全要素のフォント指定の末尾に外字用フォントを足す(元のフォントに字形が無い文字だけがこのフォントで描かれる)
+                        + "document.querySelectorAll('*').forEach(function(el){var f=getComputedStyle(el).fontFamily;if(f.indexOf('HangaGaiji')<0){el.style.fontFamily=f+\",'HangaGaiji'\";}});"
+                        + "});</script>";
+                }
+                string withBase = html.Replace("<head>", "<head>" + inject);
                 await page.SetContentAsync(withBase, new NavigationOptions { WaitUntil = new[] { WaitUntilNavigation.Networkidle0 }, Timeout = 30000 });
             }
             else
