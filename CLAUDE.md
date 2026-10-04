@@ -5,13 +5,18 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
 
 ## 現在の状態
 
-実装には未着手。方針(`.kiro/steering/`)、PDF出力方式の検証結果、開発環境メモがある。
+中核機能(`.kiro/specs/view-pdf-generation/`)の実装は完了している(Windows の検証環境での確認 = タスク14を除く)。`dotnet build` / `dotnet test` / `dotnet format` はいずれもグリーン。
 
+- `src/` — Core / Templating / Rendering / Hanga(公開API)。構成は `.kiro/steering/structure.md`
+- `tests/` — ユニットテストと結合テスト(Chromium を使う。この開発環境では `/opt/pw-browsers` の Chromium を自動で使う。CI では `HANGA_TEST_CHROMIUM`)
+- `samples/Hanga.Sample`・`tools/Hanga.ChromiumCheck` — サンプルアプリと Chromium 更新前の検証ツール
 - `.kiro/steering/` — 常時適用される方針(製品概要・技術方針・プロジェクト構成)
-- `.kiro/specs/view-pdf-generation/` — 中核機能(MVCのビューからのPDF生成)の仕様。`requirements.md`・`design.md`(レビュー済み)、`tasks.md`(作成済み)。次は `tasks.md` のタスク1から実装する
-- `docs/PDF出力方式検証レポート.md` — PuppeteerSharp とテンプレート展開方式の検証結果(版のずれへの耐性、.NET 5 / VS2019 への対応状況、RazorLight と ASP.NET Core MVC の比較)
+- `.kiro/specs/view-pdf-generation/` — 中核機能の要件定義書・設計書・実装タスクリスト。バッチでの一括生成は次回の追加開発で要件化する
+- `docs/ライブラリの使い方.md` — 呼び出し元アプリの開発者向けの手引き(登録・PDF用アクション・オプション・警告・例外・外字)
+- `docs/Chromium更新前の検証手順.md` — 運用部門向けの検証手順
+- `docs/PDF出力方式検証レポート.md` — PuppeteerSharp とテンプレート展開方式の検証結果(版のずれへの耐性、.NET 5 / VS2019 への対応状況、RazorLight と ASP.NET Core MVC の比較、外字、非同期の値の取得、同時実行)
 - `spikes/pdf-output-verification/` — 上記の検証コード(製品コードではない。`Hanga.sln` に含めない)
-- `docs/開発環境メモ.md` — Claude Code on the web実行環境の注意点(.NET 5のビルド方法、日本語フォント、Chromium、`pkill -f`の自己マッチ問題など)
+- `docs/開発環境メモ.md` — Claude Code on the web実行環境の注意点(.NET 5のビルド方法、日本語フォント、Chromium、テスト用ホストの注意、`pkill -f`の自己マッチ問題など)
 
 **方針と未決事項**(`.kiro/steering/tech.md`「採用技術」):
 
@@ -64,12 +69,19 @@ Excel帳票をPDF化する姉妹ライブラリ Utsushi(`jskny/Utsushi`)が、�
 
 ## 開発コマンド
 
-ソリューション作成後は、リポジトリのルートで以下を実行する。
+リポジトリのルートで以下を実行する。
 
 ```bash
 dotnet build
 dotnet test
 dotnet format
+
+# 呼び出し元の開発環境(Visual Studio 2019)と同じC#コンパイラ(Roslyn 3.11)でビルドできるか確かめる
+dotnet build --no-incremental -p:HangaVs2019Compiler=true
+
+# Chromium 更新前の検証ツール(サンプルの帳票の基準を作る/比べる)
+dotnet run --project tools/Hanga.ChromiumCheck -- baseline --chromium <Chromium> --arg --no-sandbox --gaiji-font IPAmj明朝 --out <フォルダ>
 ```
 
 この開発環境には `dotnet` がプリインストールされていない。セットアップ手順は `docs/開発環境メモ.md`「1. .NET SDK」を参照。
+結合テストの外字のテストには IPAmj明朝(`apt-get install -y fonts-ipamj-mincho`)が必要。

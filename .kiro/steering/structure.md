@@ -4,8 +4,7 @@ inclusion: always
 
 # Hanga プロジェクト構成方針
 
-> 本ファイルは実装着手前の方針である。PDF出力方式(`tech.md`「未決事項」)の選定と
-> `.kiro/specs/` の設計書の作成にあわせて見直し、実際の構成ができたら本ファイルを実態に合わせて更新する。
+> 中核機能(`.kiro/specs/view-pdf-generation/`)の実装は完了している。以降の変更も本方針に従うこと。
 
 ## レイヤー構成
 
@@ -30,37 +29,37 @@ PDF出力レイヤー (Rendering)            HTML → PDF(ヘッドレスChromiu
 - 外部リソース(スタイル・スクリプト・画像・フォント)の解決は、PDF出力レイヤーの責務とする。URLのパスとサーバー上のフォルダの対応付けは、ファサード経由で呼び出し元が設定する。
 - 呼び出し元プロダクトに見せる公開APIはファサード `Hanga` に集約する。依存ライブラリの型を公開APIに露出させない。
 
-## ソリューション構成(予定)
+## ソリューション構成
 
 ```
 Hanga/
 ├── src/
-│   ├── Hanga.Core/          # 例外階層・共通の値型
-│   ├── Hanga.Templating/    # CSHTMLテンプレートの展開(Razor)
-│   ├── Hanga.Rendering/     # HTML→PDF出力(ヘッドレスChromium。PuppeteerSharp 18.1.0)
-│   └── Hanga/               # ファサード(呼び出し元が参照する唯一のアセンブリ)
+│   ├── Hanga.Core/          # 例外階層・警告・用紙サイズなどの値型・オプション(HangaOptions / Cshtml2PdfOptions)
+│   ├── Hanga.Templating/    # ビューのHTML化(ViewHtmlRenderer。ASP.NET Core MVC のビュー描画を使う)
+│   ├── Hanga.Rendering/     # HTML→PDF(BrowserHost・ReportPage・ReportRenderer・PdfPrinter・GlyphSupport。PuppeteerSharp 18.1.0。ASP.NET Core に依存しない)
+│   │   └── Fonts/           # 字形の確認に使う判定用フォント(埋め込みリソース。tools/probe-fonts で生成)
+│   └── Hanga/               # 公開API(AddHanga・Cshtml2Pdf・HangaPdfConverter)と ASP.NET Core との接続(Hosting/)
 ├── tests/
-│   └── Hanga.<レイヤー名>.Tests/   # レイヤーごとのユニットテスト
+│   ├── Hanga.<レイヤー名>.Tests/   # レイヤーごとのテスト(Rendering は Chromium を使う)
+│   ├── Hanga.Tests/         # 公開API・ASP.NET Core との接続・全体の結合テスト
+│   ├── Hanga.TestApp/       # テスト用の ASP.NET Core 5 MVC アプリ(呼び出し元アプリの代わり)
+│   └── Hanga.TestSupport/   # テストの共通部品(Chromium の場所、PDF の読み取り)
 ├── samples/
-│   └── templates/<帳票コード>/      # サンプル帳票のテンプレート(.cshtml)とサンプルデータ
+│   └── Hanga.Sample/        # サンプルアプリ(使い方の例と、検証ツールの対象)
+├── tools/
+│   ├── Hanga.ChromiumCheck/ # Chromium 更新前の検証ツール
+│   └── probe-fonts/         # 判定用フォントの生成スクリプト(Python + fontTools)
+├── spikes/                  # 方式の検証コード(製品コードではない。Hanga.sln に含めない)
 ├── docs/                    # 人が読む補足ドキュメント
 ├── .kiro/
 │   ├── steering/            # 本ファイル群。プロジェクト全体に常時適用される方針
 │   └── specs/               # 機能ごとの要件定義書・設計書・タスクリスト
 ├── .claude/
-│   └── agents/              # サブエージェント定義(必要になった時点で追加する)
+│   └── agents/              # サブエージェント定義
 ├── Directory.Build.props    # 全プロジェクト共通のビルド設定(TFM/LangVersion/Nullable、VS2019コンパイラでの検証スイッチ)
+├── Directory.Build.targets  # テストプロジェクト共通設定(RollForward/テストパッケージ)、VS2019コンパイラでの検証時のアナライザーの除外
 └── Hanga.sln                # classic形式。Visual Studio 2019でもそのまま開ける
 ```
-
-CLI(`Hanga.Cli`)など動作確認用の実行可能プロジェクトを置くかどうかは、設計書で決める。
-
-> ソリューションファイルはルート直下の `Hanga.sln`(classic形式)1つだけとする。
-> Visual Studio 2019 は新しいXML形式の `.slnx` を認識できないため、`.slnx` は置かない(`tech.md`「Visual Studio 2019 対応」参照)。
-> ルートに `.sln` と `.slnx` が共存すると `dotnet build` 等の引数なし実行がエラーになる点にも注意する。
-> .NET 10 SDKの `dotnet new sln` は既定で `.slnx` を作る可能性があるため、作成時に classic形式になっていることを確認する。
-> ヘッダーの `# Visual Studio Version 16` はVS2019を示す値であり、VS2022の値(17)に書き換えない。
-> プロジェクトを追加・削除した場合は `dotnet sln Hanga.sln add/remove src/<Project>/<Project>.csproj` で更新する。
 
 ## 命名規則
 
@@ -68,16 +67,14 @@ CLI(`Hanga.Cli`)など動作確認用の実行可能プロジェクトを置く�
 - 型名が名前空間名と衝突する場合(例: 名前空間 `Hanga.Templating` と型 `Templating`)は、Utsushiの `Utsushi.ReportDefinitions` の例にならい、名前空間を複数形にする等で回避し、その理由を本ファイルに記録する。
 - サンプル帳票は `samples/templates/<帳票コード>/` に帳票コード単位でディレクトリを分ける。
 
-## 帳票の追加手順(想定)
+## 帳票の追加手順
 
-ライブラリのコードは変更しない。以下を足すだけで完結させる。
+ライブラリのコードは変更しない。呼び出し元アプリで次を行う(`docs/ライブラリの使い方.md`)。
 
-1. 帳票のテンプレート(`.cshtml`)を作成する。
-2. テンプレートに渡すモデル(POCO)を、呼び出し元プロダクト側で定義する。
-3. 用紙サイズ・余白などの出力設定を指定する(指定方法は設計書で定める)。
+1. 帳票のビュー(`.cshtml`)を作る(画面用のビューをそのまま使ってよい)。
+2. コントローラーに PDF 用のアクションを追加し、`new Cshtml2Pdf(this, ビュー名, モデル)` で PDF を返す。
+3. 用紙サイズ・向き・余白などを `pdf.Options` で指定する。
 4. ライブラリの対応範囲で表現できない要件がある場合のみ、`.kiro/specs/` に要件を追記し、ライブラリを拡張する。
-
-テンプレートの置き場所(ファイル、埋め込みリソース、文字列)と、テンプレートの探索方法は設計書で決める。
 
 ## ドキュメントの関係
 
