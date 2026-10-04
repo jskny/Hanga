@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- テストの共通部品(Chromium の場所、PDF からの文字列の取り出し)。テストプロジェクトから参照する -->
+  <PropertyGroup>
+    <RootNamespace>Hanga.TestSupport</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- PDF からの文字列・ページサイズの取り出し(テスト専用。Apache-2.0。net5.0 で警告なくビルドできることを確認済み) -->
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="xunit.extensibility.core" Version="2.4.1" />
+  </ItemGroup>
+
+</Project>

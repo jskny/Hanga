@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hanga.Core.Tests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hanga.Core\Hanga.Core.csproj" />
+    <ProjectReference Include="..\Hanga.TestSupport\Hanga.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

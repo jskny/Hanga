@@ -1,0 +1,16 @@
+@{
+    ViewData["Title"] = "幅の広い表";
+}
+
+<h1>月別売上(幅の広い表)</h1>
+<table class="wide">
+    <thead>
+        <tr><th>店舗</th>@for (int m = 1; m <= 12; m++) {<th>@(m)月</th>}<th>合計</th></tr>
+    </thead>
+    <tbody>
+        @for (int s = 1; s <= 20; s++)
+        {
+            <tr><td>店舗@(s)</td>@for (int m = 1; m <= 12; m++) {<td class="num money">@(s * 100000 + m * 1234)</td>}<td class="num money">@(s * 1200000 + 96252)</td></tr>
+        }
+    </tbody>
+</table>

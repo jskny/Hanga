@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    テスト用の ASP.NET Core 5 MVC アプリ。Hanga の呼び出し元アプリの代わりとして、
+    レイアウト・_ViewStart・~/ のパス・タグヘルパー・静的ファイル・Cookie認証・認証が必要なAPIを持つ。
+    テストからは WebApplicationFactory(テスト用のホスト)で起動する。
+  -->
+  <PropertyGroup>
+    <RootNamespace>Hanga.TestApp</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hanga\Hanga.csproj" />
+    <ProjectReference Include="..\Hanga.TestSupport\Hanga.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

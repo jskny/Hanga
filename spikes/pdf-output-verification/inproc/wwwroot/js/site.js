@@ -1,0 +1,1 @@
+document.addEventListener("DOMContentLoaded",function(){var p=document.createElement("p");p.id="js";p.textContent="site.js が実行された";document.querySelector("main").appendChild(p);window.hangaReady=true;});

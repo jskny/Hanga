@@ -1,0 +1,11 @@
+bin/
+obj/
+out/
+vs/
+sc/
+pdf/
+*.log
+*.pdf
+console/wwwroot/fonts/*.ttf
+concurrent/
+concurrent.log

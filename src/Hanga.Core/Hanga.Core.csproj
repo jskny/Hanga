@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hanga</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 内部の補助(仮想オリジンの正規化など)を Hanga の各プロジェクトから使う。呼び出し元には見せない -->
+    <InternalsVisibleTo Include="Hanga.Rendering" />
+    <InternalsVisibleTo Include="Hanga" />
+  </ItemGroup>
+
+</Project>

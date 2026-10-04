@@ -1,0 +1,31 @@
+<Project>
+
+  <!--
+    テストプロジェクト共通設定。
+    パッケージバージョンは net5.0 世代に固定する(新しすぎるとテストが発見されない。
+    根拠: docs/開発環境メモ.md「1. .NET SDK」)。
+    RollForward は、この開発環境・CI に .NET 5 ランタイムが無くても実行できるようにするため。
+  -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <IsPackable>false</IsPackable>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3" />
+  </ItemGroup>
+
+  <!--
+    VS2019 と同じコンパイラ(Roslyn 3.11)でビルドする検証モード(Directory.Build.props の HangaVs2019Compiler)では、
+    新しいSDK同梱のアナライザーを外す。RunAnalyzers=false は Web SDK(Microsoft.NET.Sdk.Web)が加えるアナライザーには効かず、
+    Roslyn 3.11 で読み込めない警告 CS8032 が大量に出るため。アナライザー込みのビルドは通常のビルドと CI の Windows ジョブで確かめる。
+  -->
+  <Target Name="HangaRemoveAnalyzersForVs2019Compiler" BeforeTargets="CoreCompile" Condition="'$(HangaVs2019Compiler)' == 'true'">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

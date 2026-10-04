@@ -1,0 +1,72 @@
+name: CI
+
+# .NET 5(net5.0)は EOL で、新しいSDK(.NET 10)で net5.0 をビルドし、テストは RollForward で新しいランタイムで実行する
+# (docs/開発環境メモ.md「1. .NET SDK」)。Windows ジョブでは VS2019 と同じツールチェーン(.NET 5 SDK 5.0.408)でビルドだけを確かめる。
+# このワークフローは Claude Code on the web では実行できないため、初回の実行結果(Actions のログ)で成否を確認し、失敗した場合はここを見直す。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    env:
+      # 結合テストで使う Chromium。ubuntu-latest のランナーには Google Chrome が入っている
+      HANGA_TEST_CHROMIUM: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # 外字のテストに IPAmj明朝、日本語の表示に IPAゴシック を使う
+      - name: Install Japanese fonts
+        run: sudo apt-get update && sudo apt-get install -y fonts-ipafont-gothic fonts-ipamj-mincho
+
+      - name: Show Chrome version
+        run: $HANGA_TEST_CHROMIUM --version
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      - name: Format check
+        run: dotnet format --verify-no-changes
+
+      # VS2019 16.11 と同じC#コンパイラ(Roslyn 3.11)でビルドし直してテストする(tech.md「Visual Studio 2019 対応」)
+      - name: Build with VS2019 compiler (Roslyn 3.11)
+        run: dotnet build --no-incremental --configuration Release -p:HangaVs2019Compiler=true
+
+      - name: Test (VS2019 compiler build)
+        run: dotnet test --no-build --configuration Release
+
+  # VS2019 16.11 と同じツールチェーン(.NET 5 SDK 5.0.408 = MSBuild 16.11 + Roslyn 3.11)で Windows 上のビルドを確かめる。
+  # global.json は Linux ジョブ・Claude Code on the web に .NET 5 SDK が無いためコミットしておらず、ここでだけ作る。
+  vs2019-toolchain:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "5.0.408"
+
+      - name: Pin .NET 5 SDK
+        shell: pwsh
+        run: |
+          '{"sdk":{"version":"5.0.408","rollForward":"latestPatch"}}' | Set-Content global.json
+
+      - name: Show SDK
+        run: dotnet --version
+
+      - name: Build
+        run: dotnet build Hanga.sln --configuration Release

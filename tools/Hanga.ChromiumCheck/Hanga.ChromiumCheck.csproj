@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Chromium のバージョンアップの前に、サンプルの帳票が正しく出力されることを確かめる検証ツール(要件11)。
+    サンプルアプリ(samples/Hanga.Sample)をこのツールの中で起動し(ローカルホストのみ)、帳票の PDF を集めて、基準と比べる(ページ数・ページサイズ・文字列・文字の位置とフォント)。
+    使い方は docs/Chromium更新前の検証手順.md。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Hanga.ChromiumCheck</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- PDF からの文字列・ページサイズの取り出し(Apache-2.0。net5.0 で警告なくビルドできることを確認済み。tech.md) -->
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\Hanga.Sample\Hanga.Sample.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- サンプルアプリの静的ファイルを、このツールの出力に含める(ツールの中でサンプルアプリを起動するため) -->
+    <Content Include="..\..\samples\Hanga.Sample\wwwroot\**\*" LinkBase="wwwroot" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

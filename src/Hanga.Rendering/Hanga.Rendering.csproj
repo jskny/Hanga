@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hanga.Rendering</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      18.1.0 に固定する。20以降は .NET 5 を公式にサポートしない依存パッケージを連れてくる(tech.md「② PDF出力」)。
+      このプロジェクトは ASP.NET Core に依存しない(design.md「プロジェクト構成とレイヤー」)。
+    -->
+    <PackageReference Include="PuppeteerSharp" Version="18.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- このプロジェクトの型は呼び出し元に見せず、ファサード(Hanga)だけが使う(要件2.6) -->
+    <InternalsVisibleTo Include="Hanga" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 字形の無い文字の検出に使う判定用フォント(tools/probe-fonts/ で生成。design.md「⑧」) -->
+    <EmbeddedResource Include="Fonts\probe-a.ttf" LogicalName="Hanga.Rendering.Fonts.probe-a.ttf" />
+    <EmbeddedResource Include="Fonts\probe-b.ttf" LogicalName="Hanga.Rendering.Fonts.probe-b.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hanga.Core\Hanga.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,12 @@
+@{
+    ViewData["Title"] = "注文明細";
+}
+
+<h1>注文明細</h1>
+<p>注文番号: <span id="orderNo">(読み込み中)</span></p>
+<p>顧客: <span id="customer">(読み込み中)</span></p>
+<p>合計: <span id="total">(読み込み中)</span></p>
+
+@section Scripts {
+    <script src="~/js/order.js" asp-append-version="true"></script>
+}
