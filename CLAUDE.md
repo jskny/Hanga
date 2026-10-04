@@ -12,6 +12,7 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
 - `tests/` — ユニットテストと結合テスト(Chromium を使う。この開発環境では `/opt/pw-browsers` の Chromium を自動で使う。CI では `HANGA_TEST_CHROMIUM`)。
   `Hanga.TestApp` は呼び出し元アプリの代わり、`Hanga.TestReports` はバッチのテストで使う帳票ライブラリ(Razor クラスライブラリ)
 - `samples/Hanga.Sample`・`tools/Hanga.ChromiumCheck` — サンプルアプリと Chromium 更新前の検証ツール
+- `samples/Hanga.EdgeCases` — エッジケースの検証(不具合が起きやすい帳票・使い方を集めたもの。機能を追加・変更したら実行し、期待と違う結果が無いことを確かめる)
 - `.kiro/steering/` — 常時適用される方針(製品概要・技術方針・プロジェクト構成)
 - `.kiro/specs/view-pdf-generation/` — 中核機能(PDF用アクションからの生成)の要件定義書・設計書・実装タスクリスト
 - `.kiro/specs/batch-pdf-generation/` — バッチ(Webアプリとは別の実行ファイル)での一括生成の要件定義書・設計書・実装タスクリスト
@@ -82,6 +83,9 @@ dotnet format
 
 # 呼び出し元の開発環境(Visual Studio 2019)と同じC#コンパイラ(Roslyn 3.11)でビルドできるか確かめる
 dotnet build --no-incremental -p:HangaVs2019Compiler=true
+
+# エッジケースの検証(終了コード = 期待と違う結果の件数。引数の誤りは -1)
+dotnet run --project samples/Hanga.EdgeCases -- --chromium <Chromium> --arg --no-sandbox --gaiji-font IPAmj明朝
 
 # Chromium 更新前の検証ツール(サンプルの帳票の基準を作る/比べる)
 dotnet run --project tools/Hanga.ChromiumCheck -- baseline --chromium <Chromium> --arg --no-sandbox --gaiji-font IPAmj明朝 --out <フォルダ>

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    エッジケースの検証用サンプル(バッチの形)。不具合が起きやすい帳票・使い方を集め、HangaBatch で順に生成して、
+    期待どおりの結果(成功・例外・警告・時間)になるかを表にして出す。期待と違う結果の件数を終了コードにする。
+    使い方は samples/Hanga.EdgeCases/README.md。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Hanga.EdgeCases</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ビルドの出力からそのまま実行できるよう、静的ファイルを出力にコピーする(Web の SDK はビルドでは wwwroot をコピーしない) -->
+    <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hanga\Hanga.csproj" />
+    <!-- ViewAssemblies を指定せずに、参照するライブラリのビューと静的Webアセットを使えるかを確かめる(ケース V09) -->
+    <ProjectReference Include="..\Hanga.EdgeCases.Library\Hanga.EdgeCases.Library.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 生成した PDF の文字列とページ数を確かめる(Apache-2.0。tech.md に記録済み) -->
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
+
+</Project>

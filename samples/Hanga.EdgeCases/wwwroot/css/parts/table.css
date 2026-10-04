@@ -1,0 +1,4 @@
+/* edge.css から @import で読み込む */
+table { border-collapse: collapse; }
+td, th { border: 1px solid #888; padding: 2px 4px; }
+.imported::after { content: "(@import適用)"; }

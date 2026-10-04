@@ -1,0 +1,4 @@
+@model EdgeModel
+@* 部分ビュー(同期と非同期)。ビューコンポーネントは、.NET 10 SDK で net5.0 向けにビルドすると Razor のコンパイラが失敗するため使わない(docs/開発環境メモ.md) *@
+<partial name="_Note" model="Model.Text" />
+@await Html.PartialAsync("_Note", Model.Text + "(非同期)")

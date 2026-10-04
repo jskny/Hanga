@@ -126,6 +126,10 @@ foreach (var customer in customers)
 検証コード(`spikes/batch-rcl-verification/`)と同じ手順で、汎用ホスト(`HostBuilder`)に Web のホストを組み込む。
 
 1. `UseContentRoot(ContentRootPath)`、`UseWebRoot(WebRootPath。未指定なら wwwroot)`、環境名(`Production`)を、Webのホストに明示する(下記の環境変数の扱い)。
+   アプリの名前(`WebHostDefaults.ApplicationKey`)は、バッチの実行ファイル(エントリのアセンブリ)の名前を、`Configure` の後に明示する。
+   `Configure` は、渡した処理を書いたアセンブリ(`Hanga`)をアプリの名前にしてしまい、ビューの自動の発見と、開発中の静的Webアセットの一覧の探索が働かなかった
+   (エッジケースの検証で見つかった不具合。テストでは `ViewAssemblies` を必ず指定していたため見逃していた)。
+   修正の後、`samples/Hanga.EdgeCases` のケース V09(参照する帳票ライブラリのビューと静的Webアセット。`ViewAssemblies` なし)が、.NET 5.0.17 のランタイムで成功することを確かめた。
 2. `UseStaticWebAssets()` を常に呼ぶ。開発中の実行(ビルドの出力)では `<バッチ名>.StaticWebAssets.xml` に従って帳票ライブラリの `wwwroot` を `/_content/<ライブラリ名>/` に重ねる。
    発行したバッチにはこの一覧が無く、何もしない(発行先の `wwwroot/_content/` から応答する)。
 3. `UseServer(new NoopServer())`: ポートを開かない(要件1.1)。ホストの起動でルーティングなどの初期化だけが行われる。

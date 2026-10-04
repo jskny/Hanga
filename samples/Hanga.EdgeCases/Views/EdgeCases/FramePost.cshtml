@@ -1,0 +1,4 @@
+@model EdgeModel
+@* 内側のフレームが、表示時にフォームを送信する画面(送信はアプリに届かない) *@
+<p>フレームを含むページ</p>
+<iframe srcdoc="<form id='f' method='post' action='/Orders/Delete'></form><script>document.getElementById('f').submit();</script><p>フレームの中</p>"></iframe>

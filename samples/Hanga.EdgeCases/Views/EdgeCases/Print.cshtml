@@ -1,0 +1,6 @@
+@model EdgeModel
+@* 表示時に window.print() を呼ぶ画面(ブラウザの印刷を使っていた画面) *@
+<p id="v">print の前</p>
+@section Scripts {
+    <script>window.print(); document.getElementById("v").textContent = "print の後";</script>
+}

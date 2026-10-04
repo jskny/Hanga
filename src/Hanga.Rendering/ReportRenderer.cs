@@ -118,7 +118,17 @@ namespace Hanga.Rendering
                     ThrowIfStrict(page.Warnings, strict);
 
                     stage = HangaStage.PdfOutput;
-                    byte[] pdf = await deadline.RunAsync(PdfPrinter.PrintAsync(page.Page, options), "PDF の出力", page).ConfigureAwait(false);
+                    ThrowIfLeftReportPage(page, stage);
+                    (byte[] pdf, HangaWarning? layoutWarning) = await deadline.RunAsync(PdfPrinter.PrintAsync(page.Page, options), "PDF の出力", page).ConfigureAwait(false);
+                    if (layoutWarning != null)
+                    {
+                        page.AddWarning(layoutWarning);
+                    }
+
+                    // 印刷の間もページの JavaScript は動く(beforeprint)。その間に起きた失敗・警告・移動も確かめ直す(要件2.7, 5.5, 8.4, 8.7)
+                    ThrowIfLeftReportPage(page, stage);
+                    ThrowIfFailed(page);
+                    ThrowIfStrict(page.Warnings, strict);
 
                     var warnings = page.Warnings;
                     if (warnings.Count > 0)
@@ -193,6 +203,17 @@ namespace Hanga.Rendering
             }
 
             await deadline.RunAsync(page.Page.EvaluateFunctionAsync<bool>("() => document.fonts.ready.then(() => true)"), "Web フォントの読み込み", page).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 帳票のページから離れていないか(about:blank など、要求を出さない移動は介入で止められない)。離れていれば、白紙の PDF を返さずエラーにする(要件2.7, 8.4)。
+        /// </summary>
+        private void ThrowIfLeftReportPage(ReportPage page, HangaStage stage)
+        {
+            if (!page.IsOnReportPage)
+            {
+                throw new HangaBrowserException("帳票のページから別のページへ移動したため、PDF を出力しませんでした。", global.ChromiumExecutablePath, host.BrowserVersion, stage);
+            }
         }
 
         private static void ThrowIfStrict(IReadOnlyList<HangaWarning> warnings, bool strict)

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -97,10 +99,15 @@ namespace Hanga.Rendering
 
         private async Task<IBrowserContext> CreateContextAsync(CancellationToken cancellationToken)
         {
+            // 帳票ごとのコンテキストには、起動引数のプロキシの除外の指定が引き継がれないため、コンテキストにも同じ指定を渡す(要件3.4)。
+            // 起動し直した場合も同じ指定にする
+            BrowserContextOptions? contextOptions = UsesBlackHoleProxy(options)
+                ? new BrowserContextOptions { ProxyServer = BlackHoleProxy, ProxyBypassList = ProxyBypassList(options) }
+                : null;
             IBrowser current = await GetBrowserAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await current.CreateBrowserContextAsync().ConfigureAwait(false);
+                return await current.CreateBrowserContextAsync(contextOptions).ConfigureAwait(false);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is HangaException))
             {
@@ -111,7 +118,7 @@ namespace Hanga.Rendering
                 IBrowser relaunched = await GetBrowserAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
-                    return await relaunched.CreateBrowserContextAsync().ConfigureAwait(false);
+                    return await relaunched.CreateBrowserContextAsync(contextOptions).ConfigureAwait(false);
                 }
                 catch (Exception retryEx) when (!(retryEx is OperationCanceledException))
                 {
@@ -172,6 +179,50 @@ namespace Hanga.Rendering
             }
         }
 
+        /// <summary>
+        /// Chromium の起動引数。呼び出し元の引数に加えて、許可した外部ホスト以外への通信を、行き止まりのプロキシ(127.0.0.1:9)に向ける(要件3.4)。
+        /// ページへの要求の介入は帳票のページの要求にしか効かず、別のウィンドウ(window.open・target=_blank)や WebSocket の通信は介入を通らないため、
+        /// その抜け道をふさぐ多重の守り(セキュリティレビューの指摘)。Hanga が自分で応える仮想オリジンへの要求はネットワークに出ないため影響しない。
+        /// 呼び出し元が --proxy-server を指定した場合(社内のプロキシが必要な環境)は加えない。
+        /// </summary>
+        internal static List<string> BuildArguments(HangaOptions options)
+        {
+            var args = new List<string>(options.ChromiumArguments);
+            if (UsesBlackHoleProxy(options))
+            {
+                args.Add("--proxy-server=" + BlackHoleProxy);
+                args.Add("--proxy-bypass-list=" + string.Join(";", ProxyBypassList(options)));
+
+                // WebRTC の UDP の通信はプロキシを通らないため、プロキシを通らない UDP を使わせない(多重の守り。未検証)
+                args.Add("--force-webrtc-ip-handling-policy=disable_non_proxied_udp");
+            }
+
+            return args;
+        }
+
+        /// <summary>
+        /// 行き止まりのプロキシを使うか。呼び出し元がプロキシを指定した場合(--proxy-server・--proxy-pac-url・--proxy-auto-detect・--no-proxy-server など)は、
+        /// 呼び出し元の指定を優先し、使わない(Hanga の指定で呼び出し元の指定を黙って打ち消さないため)。
+        /// </summary>
+        internal static bool UsesBlackHoleProxy(HangaOptions options) =>
+            !options.ChromiumArguments.Any(a =>
+                a.StartsWith("--proxy-", StringComparison.OrdinalIgnoreCase) || a.StartsWith("--no-proxy-server", StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// プロキシを通さない(直接つなぐ)宛先: 許可した外部ホストだけ。<c>&lt;-loopback&gt;</c> は、Chromium が既定でプロキシを通さない
+        /// ループバック(localhost・127.0.0.1)も、行き止まりのプロキシに向ける指定。後ろの規則が優先されるため、先頭に置く
+        /// (後ろに置くと、許可したホストが 127.0.0.1 などのループバックの場合に、行き止まりに向いてしまった)。
+        /// </summary>
+        internal static string[] ProxyBypassList(HangaOptions options) =>
+            new[] { "<-loopback>" }.Concat(options.AllowedExternalHosts.Select(h => h.Trim()).Where(h => h.Length > 0)).ToArray();
+
+        /// <summary>
+        /// 行き止まりのプロキシ。名前解決できないホスト(.invalid は RFC 6761 で実在しないことが保証される)にし、どこにもつながらないようにする。
+        /// 127.0.0.1 のポートにすると、Windows では利用者の権限で同じポートを待ち受けられ、通信を受け取れてしまうため。
+        /// プロキシにつながらない場合も、Chromium は直接の接続に切り替えない(2026年10月4日、Chrome 141 で確認)。
+        /// </summary>
+        internal const string BlackHoleProxy = "http://hanga-blackhole.invalid:9";
+
         private async Task<IBrowser> LaunchAsync()
         {
             string path = options.ChromiumExecutablePath;
@@ -192,7 +243,7 @@ namespace Hanga.Rendering
                     Headless = true,
                     ExecutablePath = path,
                     UserDataDir = userDataDir,
-                    Args = options.ChromiumArguments.ToArray(),
+                    Args = BuildArguments(options).ToArray(),
                 };
                 launched = await Puppeteer.LaunchAsync(launchOptions).ConfigureAwait(false);
                 BrowserVersion = await launched.GetVersionAsync().ConfigureAwait(false);

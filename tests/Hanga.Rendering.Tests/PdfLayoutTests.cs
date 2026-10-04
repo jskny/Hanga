@@ -66,6 +66,8 @@ namespace Hanga.Rendering.Tests
             double expected = PdfLayout.PxToMm(1000 * 0.5) + 20 + PdfLayout.SinglePageSlackMm;
             Assert.Equal(expected, PdfLayout.SinglePageHeightMm(options, 1000, 0.5), 6);
             Assert.Equal(PaperSize.MaxMillimeters, PdfLayout.SinglePageHeightMm(options, 10_000_000, 1));
+            Assert.True(PdfLayout.SinglePageOverflows(options, 10_000_000, 1));
+            Assert.False(PdfLayout.SinglePageOverflows(options, 1000, 0.5));
         }
 
         [Fact]

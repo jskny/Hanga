@@ -1,0 +1,10 @@
+@model EdgeModel
+@* 明細が 0 行 *@
+<h1>明細なし</h1>
+<table>
+    @foreach (var item in Model.Items)
+    {
+        <tr><td>@item</td></tr>
+    }
+</table>
+<p>明細はありません</p>

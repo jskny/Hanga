@@ -1,0 +1,6 @@
+@model EdgeModel
+@* JavaScript が無限ループする画面(ページが応答しなくなる) *@
+<p>無限ループ</p>
+@section Scripts {
+    <script>setTimeout(function () { while (true) { } }, 0);</script>
+}

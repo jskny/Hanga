@@ -1,0 +1,6 @@
+@model EdgeModel
+@* POST のフォーム(タグヘルパーが偽造防止のトークンを加える) *@
+<form method="post" action="/Orders/Save">
+    <input name="name" value="@Model.Text" />
+</form>
+<p>フォームの後</p>

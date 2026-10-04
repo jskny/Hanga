@@ -12,8 +12,10 @@ namespace Hanga.Rendering
         internal const string PageNumberFooter =
             "<div style=\"font-size:9px;width:100%;text-align:center;\"><span class=\"pageNumber\"></span> / <span class=\"totalPages\"></span></div>";
 
-        public static async Task<byte[]> PrintAsync(IPage page, Cshtml2PdfOptions options)
+        /// <summary>PDF にする。1 ページ化で用紙の高さの上限を超えた場合は、警告を返す(要件5.5)。</summary>
+        public static async Task<(byte[] Pdf, HangaWarning? Warning)> PrintAsync(IPage page, Cshtml2PdfOptions options)
         {
+            HangaWarning? warning = null;
             // 1. 印刷用/画面用の CSS(要件5.6)
             await page.EmulateMediaTypeAsync(options.CssMedia == CssMedia.Screen ? MediaType.Screen : MediaType.Print).ConfigureAwait(false);
 
@@ -32,6 +34,13 @@ namespace Hanga.Rendering
                 double contentHeight = await page.EvaluateFunctionAsync<double>(
                     "() => Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)").ConfigureAwait(false);
                 heightMm = PdfLayout.SinglePageHeightMm(options, contentHeight, scale);
+                if (PdfLayout.SinglePageOverflows(options, contentHeight, scale))
+                {
+                    warning = new HangaWarning(
+                        HangaWarningKind.SinglePageOverflow,
+                        $"1 ページ化で、内容の高さが用紙の高さの上限({PaperSize.MaxMillimeters}mm)を超えたため、複数ページになりました。",
+                        $"内容の高さ: 約 {Math.Round(PdfLayout.PxToMm(contentHeight * scale))}mm");
+                }
             }
 
             // 3. 文書のタイトル(要件5.9)。Chromium は document.title を PDF の文書のタイトルにする。値は引数で渡し、式に埋め込まない
@@ -62,7 +71,7 @@ namespace Hanga.Rendering
                 pdfOptions.FooterTemplate = PageNumberFooter;
             }
 
-            return await page.PdfDataAsync(pdfOptions).ConfigureAwait(false);
+            return (await page.PdfDataAsync(pdfOptions).ConfigureAwait(false), warning);
         }
 
         private static Task SetViewportWidthAsync(IPage page, double widthPx) =>

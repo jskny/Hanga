@@ -1,0 +1,6 @@
+@model EdgeModel
+@* 表示時に alert() を出す画面(ダイアログで JavaScript が止まる) *@
+<p id="v">alert の前</p>
+@section Scripts {
+    <script>alert("お知らせ"); document.getElementById("v").textContent = "alert の後";</script>
+}
