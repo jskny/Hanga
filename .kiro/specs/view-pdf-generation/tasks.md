@@ -73,17 +73,18 @@
     - _Requirements: 9.2, 9.4〜9.6_
 
 - [ ] 5. Rendering: ページの表示と要求の振り分け
-  - [ ] 5.1 `IVirtualOriginHandler`(仮想オリジンへの要求を受け取って応答を返すインターフェース)と、その要求・応答の型を定義する(PuppeteerSharp・ASP.NET Core の型を含めない)
+  - [x] 5.1 `IVirtualOriginHandler`(仮想オリジンへの要求を受け取って応答を返すインターフェース)と、その要求・応答の型を定義する(PuppeteerSharp・ASP.NET Core の型を含めない)
     - _Requirements: 2.6, 3.1_
-  - [ ] 5.2 `ReportPage`: 要求への介入を有効にし、ページ内のJavaScript(`location.href`)で仮想オリジンへ移動し、`/__hanga/report` に帳票のHTMLを返す
+  - [x] 5.2 `ReportPage`: 要求への介入を有効にし、ページ内のJavaScript(`location.href`)で仮想オリジンへ移動し、`/__hanga/report` に帳票のHTMLを返す
     - _Requirements: 2.3, 2.4_
-  - [ ] 5.3 要求の振り分け(1): `/__hanga/` のリソース(埋め込みリソース)、`favicon.ico`(204)、その他の仮想オリジンへの要求を `IVirtualOriginHandler` へ渡す
+  - [x] 5.3 要求の振り分け(1): `/__hanga/` のリソース(埋め込みリソース)、`favicon.ico`(204)、その他の仮想オリジンへの要求を `IVirtualOriginHandler` へ渡す
     - _Requirements: 3.1, 3.7_
   - [ ] 5.4 要求の振り分け(2): 仮想オリジンへの要求の失敗(400以上・300番台)の記録と、表示の後のエラー化(`HangaResourceRequestException`)
     - _Requirements: 3.5, 8.4_
-  - [ ] 5.5 要求の振り分け(3): 許可した外部ホストは通し、それ以外は遮断して警告 `BlockedExternalRequest`(厳格ならエラー)
+    - 注記: 失敗の記録は `ReportPage` で行う(タスク5で実装済み)。エラー化は、描画全体を組み立てる `ReportRenderer`(タスク6.3と同時)で行う。
+  - [x] 5.5 要求の振り分け(3): 許可した外部ホストは通し、それ以外は遮断して警告 `BlockedExternalRequest`(厳格ならエラー)
     - _Requirements: 3.4, 3.6_
-  - [ ] 5.6 5.1〜5.5 のテスト(Chromiumを使う。`IVirtualOriginHandler` はテスト用の実装を使う)
+  - [x] 5.6 5.1〜5.5 のテスト(Chromiumを使う。`IVirtualOriginHandler` はテスト用の実装を使う)
     - _Requirements: 2.3, 2.4, 3.1, 3.4〜3.7_
 
 - [ ] 6. Rendering: 表示の完了の待機
