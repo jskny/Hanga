@@ -54,6 +54,29 @@ services.AddHanga(options =>
 });
 ```
 
+設定ファイル(`appsettings.json`)からも指定できる。運用部門が、プログラムを修正・再ビルドせずに値を変えられるようにするため。
+
+```csharp
+services.AddHanga(Configuration.GetSection("Hanga"));                   // 設定ファイルの値だけを使う
+services.AddHanga(Configuration.GetSection("Hanga"), options => { ... }); // 設定ファイルの値を読んだ後、コードで上書きする
+```
+
+```json
+{
+  "Hanga": {
+    "ChromiumExecutablePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "GaijiFontFamily": "IPAmj明朝",
+    "MaxConcurrentRenders": 4,
+    "RenderTimeout": "00:00:30",
+    "AllowedExternalHosts": [ "cdn.example.com" ]
+  }
+}
+```
+
+- 設定ファイルに書かなかった項目は既定値になる(下表)。
+- 値は `AddHanga` の時点(登録時)に検証し、範囲外(`MaxConcurrentRenders` が1未満など)なら `HangaConfigurationException` にする。
+- 設定ファイルの値を変えた場合は、アプリの再起動で反映する(同時実行数の枠やChromiumの起動引数は起動時に決まるため。動作中の変更は扱わない)。
+
 `AddHanga` は次を登録する(要件12.5)。
 
 - `HangaPdfConverter`(シングルトン。共有の変換器)
@@ -92,7 +115,7 @@ public async Task<IActionResult> OrderPdf(int id)
 | `ChromiumExecutablePath` | (必須) | Chromiumの実行ファイル(要件2.2) |
 | `ChromiumArguments` | 空 | Chromiumに渡す追加の引数(`--no-sandbox` 等。環境に合わせて運用で決める) |
 | `LaunchOnStartup` | `false` | アプリの起動時にChromiumを起動する(要件10.2) |
-| `MaxConcurrentRenders` | 4(仮) | 同時に処理する帳票の数(要件9.4)。根拠と決め方は下記「同時に処理する帳票の数」 |
+| `MaxConcurrentRenders` | 4 | 同時に処理する帳票の数(要件9.4)。設定ファイルで変えられる。決め方は下記「同時に処理する帳票の数」 |
 | `RenderTimeout` | 30秒 | 表示の完了を待つ上限(要件4.3) |
 | `AllowedExternalHosts` | 空 | 仮想オリジン以外で取得を許すホスト(要件3.4) |
 | `GaijiFontFamily` / `GaijiFontFile` | 未指定 | 外字用フォント(名前 または ファイル。要件6.1) |
@@ -302,8 +325,10 @@ HangaException(基底。Stage: 失敗した段階)
 - 1件の処理時間の多くは、通信が止んでから500ミリ秒待つ「ネットワークの静止」の待ち時間で、CPUを使っていない。このため、CPUのコア数(4)を超えて同時に処理しても、処理量は増えた。
 - したがって、上限を決める主な要因は **メモリ** である。
 
-既定の4は、計測の前に置いた控えめな値で、根拠のある値ではない。本番サーバーのメモリと、同時にPDFを要求するオペレーターの数から決める。
-目安: `上限 ≒ (Chromiumに割り当てられるメモリ − 約700MB) ÷ 130MB`。本番サーバー(Windows)でのメモリの使い方はLinuxと異なる可能性があるため、検証環境で計測し直してから既定値を確定する。
+既定値は4とする(利用部門の判断。2026年10月4日)。上の計測では、4件同時でChromium全体が約1.2GBで、処理量も1件ずつの約3倍になる。
+本番サーバーのメモリと、同時にPDFを要求するオペレーターの数に合わせて、設定ファイルで変える。
+目安: `上限 ≒ (Chromiumに割り当てられるメモリ − 約700MB) ÷ 130MB`。本番サーバー(Windows)でのメモリの使い方はLinuxと異なる可能性があるため、検証環境で計測し直して調整する。
+調整の手順は、利用の手引き(`docs/ライブラリの使い方.md`)に書く。
 
 ## 未検証の事項(実装時・Windows Server の検証環境で確認する)
 
@@ -315,5 +340,4 @@ HangaException(基底。Stage: 失敗した段階)
 
 ## 決めてほしいこと
 
-- `MaxConcurrentRenders` の既定値。本番サーバーのメモリ・CPU、同時にPDFを要求するオペレーターの数(上記「同時に処理する帳票の数」)。
 - `RenderTimeout` の既定(30秒)、余白の既定(上下左右10mm)。
