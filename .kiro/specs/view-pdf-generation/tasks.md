@@ -60,16 +60,16 @@
   - [x] 3.5 `Hanga.TestApp` を使ったテスト: レイアウト・`ViewData`・セクション・部分ビュー・`~/`・`asp-append-version`・`asp-controller`/`asp-action` が画面と同じHTMLになること、見つからない場合・例外の場合
     - _Requirements: 1.1〜1.5_
 
-- [ ] 4. Rendering: Chromium の管理
-  - [ ] 4.1 `BrowserHost`: 設定された実行ファイルでChromiumを起動する(追加の引数、プロセスごとの一時ユーザーデータフォルダとその削除)。起動の失敗は `HangaBrowserException`(実行ファイルの場所付き)
+- [x] 4. Rendering: Chromium の管理
+  - [x] 4.1 `BrowserHost`: 設定された実行ファイルでChromiumを起動する(追加の引数、プロセスごとの一時ユーザーデータフォルダとその削除)。起動の失敗は `HangaBrowserException`(実行ファイルの場所付き)
     - _Requirements: 2.2, 8.3_
-  - [ ] 4.2 `BrowserHost`: 最初の利用時の起動(排他制御付き)と、起動直後の版の記録(`ILogger`)
+  - [x] 4.2 `BrowserHost`: 最初の利用時の起動(排他制御付き)と、起動直後の版の記録(`ILogger`)
     - _Requirements: 10.2, 11.3_
-  - [ ] 4.3 `BrowserHost`: Chromiumのプロセスの終了(`Disconnected`)を検知し、次の利用時に排他制御のうえで1回だけ起動し直す
+  - [x] 4.3 `BrowserHost`: Chromiumのプロセスの終了(`Disconnected`)を検知し、次の利用時に排他制御のうえで1回だけ起動し直す
     - _Requirements: 9.5_
-  - [ ] 4.4 同時実行数の枠(`SemaphoreSlim(MaxConcurrentRenders)`)と、帳票1件ごとのブラウザコンテキスト(`CreateBrowserContextAsync`)の作成・破棄(例外・取り消しの場合も破棄する)
+  - [x] 4.4 同時実行数の枠(`SemaphoreSlim(MaxConcurrentRenders)`)と、帳票1件ごとのブラウザコンテキスト(`CreateBrowserContextAsync`)の作成・破棄(例外・取り消しの場合も破棄する)
     - _Requirements: 9.2, 9.4, 9.6, 10.1_
-  - [ ] 4.5 4.1〜4.4 のテスト(Chromiumを使う): 起動・版の取得、プロセスを止めた後の再起動、枠を超えた要求が待たされること、取り消し、コンテキスト間で localStorage が共有されないこと
+  - [x] 4.5 4.1〜4.4 のテスト(Chromiumを使う): 起動・版の取得、プロセスを止めた後の再起動、枠を超えた要求が待たされること、取り消し、コンテキスト間で localStorage が共有されないこと
     - _Requirements: 9.2, 9.4〜9.6_
 
 - [ ] 5. Rendering: ページの表示と要求の振り分け

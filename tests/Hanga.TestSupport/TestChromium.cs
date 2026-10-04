@@ -10,6 +10,12 @@ namespace Hanga.TestSupport
         private const string PreinstalledPath = "/opt/pw-browsers/chromium";
 
         /// <summary>
+        /// テストで Chromium に渡す起動引数。この開発環境(root で動く)と CI(Ubuntu 24.04 は非特権のユーザー名前空間を制限する)では
+        /// Chromium のサンドボックスを使えないため外す。本番の起動引数は運用で決める(design.md「オプション」)。
+        /// </summary>
+        public static string[] Arguments { get; } = { "--no-sandbox" };
+
+        /// <summary>
         /// 環境変数 <c>HANGA_TEST_CHROMIUM</c>、無ければこの開発環境のプリインストール版を返す。
         /// どちらも無い場合は、テストを飛ばさずに失敗させる(Chromium の無い環境で結合テストが通ったことにしないため)。
         /// </summary>
