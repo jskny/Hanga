@@ -8,7 +8,7 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
 実装には未着手。方針(`.kiro/steering/`)、PDF出力方式の検証結果、開発環境メモがある。
 
 - `.kiro/steering/` — 常時適用される方針(製品概要・技術方針・プロジェクト構成)
-- `.kiro/specs/` — 未作成。中核機能の要件定義書・設計書・実装タスクリストをここに作る
+- `.kiro/specs/view-pdf-generation/` — 中核機能(MVCのビューからのPDF生成)の仕様。`requirements.md` 作成済み(レビュー待ち)。次は `design.md` → `tasks.md`
 - `docs/PDF出力方式検証レポート.md` — PuppeteerSharp とテンプレート展開方式の検証結果(版のずれへの耐性、.NET 5 / VS2019 への対応状況、RazorLight と ASP.NET Core MVC の比較)
 - `spikes/pdf-output-verification/` — 上記の検証コード(製品コードではない。`Hanga.sln` に含めない)
 - `docs/開発環境メモ.md` — Claude Code on the web実行環境の注意点(.NET 5のビルド方法、日本語フォント、Chromium、`pkill -f`の自己マッチ問題など)
