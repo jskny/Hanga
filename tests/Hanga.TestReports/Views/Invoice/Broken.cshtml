@@ -1,0 +1,3 @@
+@model InvoiceModel
+@* モデルを渡さないと、描画中に NullReferenceException になる(ビューの例外のテスト) *@
+<p>宛名: @Model.CustomerName.Length</p>

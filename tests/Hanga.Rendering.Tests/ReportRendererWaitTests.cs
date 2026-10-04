@@ -36,16 +36,17 @@ namespace Hanga.Rendering.Tests
         [Fact]
         public async Task 完了条件が満たされなければ条件を含むタイムアウトのエラー()
         {
-            // 要件4.3, 4.4
+            // 要件4.3, 4.4。上限時間は、ページの読み込みとネットワークの静止(500ミリ秒)を、負荷の高い CI でも確実に越えられる長さにする
+            // (短すぎると、完了条件の待機に入る前の段階でタイムアウトし、条件がメッセージに入らない)
             var stopwatch = Stopwatch.StartNew();
             var ex = await Assert.ThrowsAsync<HangaTimeoutException>(() => RenderAsync(
                 Page("<p>完了しない</p>"),
                 new FakeVirtualOriginHandler(),
-                o => { o.ReadyExpression = "window.neverReady === true"; o.Timeout = TimeSpan.FromSeconds(2); }));
+                o => { o.ReadyExpression = "window.neverReady === true"; o.Timeout = TimeSpan.FromSeconds(6); }));
 
             Assert.Contains("window.neverReady === true", ex.Message);
             Assert.Equal(HangaStage.Waiting, ex.Stage);
-            Assert.InRange(stopwatch.Elapsed.TotalSeconds, 1.5, 10);
+            Assert.InRange(stopwatch.Elapsed.TotalSeconds, 5.5, 20);
         }
 
         [Fact]

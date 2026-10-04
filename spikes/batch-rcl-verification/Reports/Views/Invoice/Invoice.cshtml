@@ -1,0 +1,5 @@
+@model InvoiceModel
+@{ ViewData["Title"] = "請求書 " + Model.CustomerName; }
+<h1>請求書</h1>
+<p class="customer">@Model.CustomerName 様</p>
+<p class="amount">@Model.Amount.ToString("N0") 円</p>

@@ -37,7 +37,8 @@ namespace Hanga
             return Register(services, options);
         }
 
-        private static IServiceCollection Register(IServiceCollection services, HangaOptions options)
+        /// <summary>Hanga の部品を登録する。Web アプリ(AddHanga)とバッチ(HangaBatch のホスト)で共通。</summary>
+        internal static IServiceCollection Register(IServiceCollection services, HangaOptions options)
         {
             // 登録時に検証し、誤りがあればアプリの起動前に知らせる(要件12.6、design.md「登録」)
             options.Validate();

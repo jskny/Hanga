@@ -5,17 +5,20 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
 
 ## 現在の状態
 
-中核機能(`.kiro/specs/view-pdf-generation/`)の実装は完了している(Windows の検証環境での確認 = タスク14を除く)。`dotnet build` / `dotnet test` / `dotnet format` はいずれもグリーン。
+中核機能(`.kiro/specs/view-pdf-generation/`)と、バッチでの一括生成(`.kiro/specs/batch-pdf-generation/`)の実装は完了している
+(Windows の検証環境での確認 = それぞれタスク14・タスク7を除く)。`dotnet build` / `dotnet test` / `dotnet format` はいずれもグリーン。
 
 - `src/` — Core / Templating / Rendering / Hanga(公開API)。構成は `.kiro/steering/structure.md`
-- `tests/` — ユニットテストと結合テスト(Chromium を使う。この開発環境では `/opt/pw-browsers` の Chromium を自動で使う。CI では `HANGA_TEST_CHROMIUM`)
+- `tests/` — ユニットテストと結合テスト(Chromium を使う。この開発環境では `/opt/pw-browsers` の Chromium を自動で使う。CI では `HANGA_TEST_CHROMIUM`)。
+  `Hanga.TestApp` は呼び出し元アプリの代わり、`Hanga.TestReports` はバッチのテストで使う帳票ライブラリ(Razor クラスライブラリ)
 - `samples/Hanga.Sample`・`tools/Hanga.ChromiumCheck` — サンプルアプリと Chromium 更新前の検証ツール
 - `.kiro/steering/` — 常時適用される方針(製品概要・技術方針・プロジェクト構成)
-- `.kiro/specs/view-pdf-generation/` — 中核機能の要件定義書・設計書・実装タスクリスト。バッチでの一括生成は次回の追加開発で要件化する
-- `docs/ライブラリの使い方.md` — 呼び出し元アプリの開発者向けの手引き(登録・PDF用アクション・オプション・警告・例外・外字)
+- `.kiro/specs/view-pdf-generation/` — 中核機能(PDF用アクションからの生成)の要件定義書・設計書・実装タスクリスト
+- `.kiro/specs/batch-pdf-generation/` — バッチ(Webアプリとは別の実行ファイル)での一括生成の要件定義書・設計書・実装タスクリスト
+- `docs/ライブラリの使い方.md` — 呼び出し元アプリの開発者向けの手引き(登録・PDF用アクション・オプション・警告・例外・外字・バッチでの一括生成)
 - `docs/Chromium更新前の検証手順.md` — 運用部門向けの検証手順
-- `docs/PDF出力方式検証レポート.md` — PuppeteerSharp とテンプレート展開方式の検証結果(版のずれへの耐性、.NET 5 / VS2019 への対応状況、RazorLight と ASP.NET Core MVC の比較、外字、非同期の値の取得、同時実行)
-- `spikes/pdf-output-verification/` — 上記の検証コード(製品コードではない。`Hanga.sln` に含めない)
+- `docs/PDF出力方式検証レポート.md` — PuppeteerSharp とテンプレート展開方式の検証結果(版のずれへの耐性、.NET 5 / VS2019 への対応状況、RazorLight と ASP.NET Core MVC の比較、バッチ、外字、非同期の値の取得、同時実行)
+- `spikes/pdf-output-verification/`・`spikes/batch-rcl-verification/` — 上記の検証コード(製品コードではない。`Hanga.sln` に含めない)
 - `docs/開発環境メモ.md` — Claude Code on the web実行環境の注意点(.NET 5のビルド方法、日本語フォント、Chromium、テスト用ホストの注意、`pkill -f`の自己マッチ問題など)
 
 **方針と未決事項**(`.kiro/steering/tech.md`「採用技術」):
@@ -24,10 +27,11 @@ CSHTML(Razor)テンプレートとデータから、帳票PDFを簡易的に生�
   `GoToAsync`(`Page.navigate`)は使わない(18.1.0は新しいChromeで失敗する)。ページ内のJavaScriptで仮想オリジンへ移動し、
   そこへの要求(静的ファイル・API)はすべてアプリ自身のパイプラインにプロセス内で渡す(オペレーターのCookieを引き継ぐ)。根拠は `docs/PDF出力方式検証レポート.md`。
 - テンプレート展開は ASP.NET Core MVC のビュー描画機能(`IRazorViewEngine`)を使い、RazorLight は採用しない(決定)。
-  主な使い方はコントローラーのPDF用アクションからの生成。バッチでの一括生成は将来の候補で、実現できることを検証済み。
+  使い方はコントローラーのPDF用アクションからの生成と、Webアプリとは別の実行ファイル(バッチ)での一括生成の2つ。
+  バッチでは、HangaがWebサーバーを持たないASP.NET Coreのホストをバッチの中に作り、Razor クラスライブラリにまとめた帳票のビューを使う(アプリケーションサーバーにはアクセスしない)。
   帳票テンプレートは呼び出し元アプリの既存ビューと同じ書き方(`ViewData`、`_Layout.cshtml`、`~/`、タグヘルパー)であり、RazorLight では扱えなかったため。
 - 外字は、Hangaが外字用フォント(インストール済みのIPAmj明朝などを名前で参照)を注入して対応する。
-- 利用部門の回答で決まった要件の前提は `.kiro/steering/product.md`「要件の前提」。バッチでの一括生成は次回以降のセッションで要件に取り込む。
+- 利用部門の回答で決まった要件の前提は `.kiro/steering/product.md`「要件の前提」(バッチでの一括生成の前提を含む)。
 - 本番サーバーは Windows Server(Docker不可)。Chromiumは運用部門がバージョンアップする前提で設計する。
 
 実装中に環境起因と思われるエラーに遭遇したら、まず `docs/開発環境メモ.md` を確認する。

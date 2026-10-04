@@ -36,7 +36,7 @@ PDF用アクション(元の要求)
 | `Hanga` | 公開API(`Cshtml2Pdf`・`HangaPdfConverter`・`AddHanga`)、パイプラインの捕捉とプロセス内の要求の転送 | 上記すべて、ASP.NET Core |
 
 - `Hanga.Rendering` はASP.NET Coreに依存しない。仮想オリジンへの要求は、`Hanga.Rendering` が定義するインターフェース `IVirtualOriginHandler` に渡し、
-  その実装(パイプラインへの転送)は `Hanga` が持つ。バッチ(要件1.6)では、この実装を差し替える。
+  その実装(パイプラインへの転送)は `Hanga` が持つ。バッチ(要件1.6)では、転送先のパイプラインを、Hangaがバッチの中に作ったものにする(`.kiro/specs/batch-pdf-generation/design.md`)。
 - PuppeteerSharp の型は `Hanga.Rendering` の外に出さない(要件2.6、`tech.md`「Chromiumのバージョンアップへの備え」)。
 
 ## 公開API
@@ -102,7 +102,7 @@ public async Task<IActionResult> OrderPdf(int id)
 | `Cshtml2Pdf(HttpContext httpContext, string controllerName, string viewName, object? model)` | コントローラーの外(ミドルウェア等)から使う場合 |
 | `Options`(`Cshtml2PdfOptions`) | 帳票1件ごとの体裁(下記) |
 | `Task<HangaPdfDocument> GenerateAsync(CancellationToken)` | PDFのバイト列(`Content`)と警告の一覧(`Warnings`)を返す |
-| `Task<byte[]> ToBytesAsync(...)` / `Task WriteToAsync(Stream, ...)` / `Task SaveAsync(string path, ...)` | 要件7.1 |
+| `Task<byte[]> ToBytesAsync(...)` / `Task WriteToAsync(Stream, ...)` / `Task SaveAsync(string path, ...)` | 要件7.1。`SaveAsync` は同じフォルダの一時ファイルに書いてから名前を変える(失敗・取り消しで途中までのファイルを残さない。バッチの仕様の要件4.2) |
 | `Task<IActionResult> ToActionResultAsync(string? fileName, PdfDisposition, ...)` | 要件7.2〜7.4 |
 
 `Cshtml2Pdf` はスレッドセーフではない(要件9.1)。Utsushi の `Excel2Pdf` と同じく、帳票1件ごとに作る。`HangaPdfConverter` はスレッドセーフで、アプリ全体で1つを共有する。
@@ -167,7 +167,8 @@ IISのリバースプロキシの背後で `UseHttpsRedirection` を使ってい
 3. `ViewDataDictionary` は、コントローラーから作った場合はコントローラーの `ViewData` を引き継ぎ(`ViewBag` を含む)、`Model` を設定する。
 4. `ViewContext` を作り、`IView.RenderAsync` で `StringWriter` に書き出す。描画中の例外は `HangaViewRenderingException` に包む(要件1.5)。
 
-元の要求が無い場合(バッチ。要件1.6)に必要な `HttpContext` の作り方(何もしないサーバーでのホスト起動、ダミーのエンドポイント)は検証レポート「6.4」にあり、次回以降の版で扱う。
+元の要求が無い場合(バッチ。要件1.6)に必要な `HttpContext` の作り方(何もしないサーバーでのホスト起動、ダミーのエンドポイント)は検証レポート「6.4」にあり、
+バッチの仕様(`.kiro/specs/batch-pdf-generation/design.md`「帳票1件用の `HttpContext`」)で扱う。
 
 ### ③④ Chromiumとブラウザコンテキストの管理(`Hanga.Rendering.BrowserHost`)
 

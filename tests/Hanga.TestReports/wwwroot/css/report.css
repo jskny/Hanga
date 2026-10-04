@@ -1,0 +1,6 @@
+body { font-family: "IPAGothic", sans-serif; }
+
+/* 帳票ライブラリの CSS が読み込まれたことを、PDF の文字列で確かめる */
+.total::after {
+    content: "(CSS適用)";
+}
