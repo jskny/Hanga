@@ -92,7 +92,7 @@ public async Task<IActionResult> OrderPdf(int id)
 | `ChromiumExecutablePath` | (必須) | Chromiumの実行ファイル(要件2.2) |
 | `ChromiumArguments` | 空 | Chromiumに渡す追加の引数(`--no-sandbox` 等。環境に合わせて運用で決める) |
 | `LaunchOnStartup` | `false` | アプリの起動時にChromiumを起動する(要件10.2) |
-| `MaxConcurrentRenders` | 4 | 同時に処理する帳票の数(要件9.4) |
+| `MaxConcurrentRenders` | 4(仮) | 同時に処理する帳票の数(要件9.4)。根拠と決め方は下記「同時に処理する帳票の数」 |
 | `RenderTimeout` | 30秒 | 表示の完了を待つ上限(要件4.3) |
 | `AllowedExternalHosts` | 空 | 仮想オリジン以外で取得を許すホスト(要件3.4) |
 | `GaijiFontFamily` / `GaijiFontFile` | 未指定 | 外字用フォント(名前 または ファイル。要件6.1) |
@@ -108,7 +108,7 @@ public async Task<IActionResult> OrderPdf(int id)
 | `Orientation` | `Portrait` | `Landscape` で幅と高さを入れ替える |
 | `Margins` | 上下左右 10mm | `PageMargins`(mm) |
 | `Scale` | 1.0 | 拡大縮小の倍率。Chromiumの制約で 0.1〜2.0(要件5.3) |
-| `FitToPageWidth` | `true`(**要確認**) | 内容の幅が印刷可能な幅を超えるときだけ縮小する(要件5.4) |
+| `FitToPageWidth` | `true` | 内容の幅が印刷可能な幅を超えるときだけ縮小する。`false` で無効にできる(要件5.4) |
 | `SinglePage` | `false` | 内容の高さに合わせた1ページにする(要件5.5) |
 | `CssMedia` | `Print` | `Print`(印刷用CSS)/ `Screen`(画面用CSS)(要件5.6) |
 | `PrintBackground` | `true` | 要件5.7 |
@@ -117,7 +117,7 @@ public async Task<IActionResult> OrderPdf(int id)
 | `ReadyExpression` | 未指定 | 完了条件のJavaScriptの式(要件4.2) |
 | `Timeout` / `Strict` | 未指定 | 指定すれば `HangaOptions` の値を上書きする(要件4.3, 8.7) |
 
-`FitToPageWidth` の既定を `true` とする案: 画面の全体をPDFにしたいという要望(product.md「要件の前提」)に合うため。
+`FitToPageWidth` の既定は `true`(利用部門の判断。2026年10月4日): 画面の全体をPDFにしたいという要望(product.md「要件の前提」)に合うため。
 内容が用紙に収まる画面では倍率が1のままで、影響しない。検証では、幅1800pxの表が、縮小しないと右端の列が全行切れた(下記「検証結果」)。
 
 ## 各部の設計
@@ -284,6 +284,27 @@ HangaException(基底。Stage: 失敗した段階)
 | 字形の無い文字の検出 | 外字用フォントなし: 「𠮷」・U+E000・U+0379 を検出。外字用フォントあり: U+E000・U+0379 のみ(「𠮷」は外字用フォントで描かれる)。単純に「未割り当ての文字を描いた結果」と比べる方式は、OSのフォント(Unifont)が符号位置ごとに異なる字形を描くため使えなかった |
 | Chromiumを使い回した場合の時間 | 1件ずつ: 約1.15秒/件(5件)。8件同時: 合計約1.9秒(ビューのHTML化・APIの処理を除く) |
 
+### 同時に処理する帳票の数(`MaxConcurrentRenders`)
+
+2026年10月4日、この開発環境(CPU 4コア、メモリ16GB、Linux)で、Chromiumを使い回し、同時に処理する数を変えて計測した(検証コード: `design-checks/` の `concurrency`)。
+帳票は60行の表1つ。ビューのHTML化・APIの処理は含まない。
+
+| 同時に処理する数 | Chromium全体の実メモリ | 20件を処理する時間 | 1件あたり |
+|---|---|---|---|
+| (待機中) | 約690MB | — | — |
+| 1 | 約830MB | 23.6秒 | 1.18秒 |
+| 2 | 約970MB | 12.3秒 | 0.62秒 |
+| 4 | 約1,230MB | 7.1秒 | 0.36秒 |
+| 8 | 約1,750MB | 5.1秒 | 0.25秒 |
+| 16 | 約2,780MB | 3.8秒 | 0.19秒 |
+
+- 実メモリは、Chromiumの各プロセスのRSSの合計(共有部分を重複して数えるため、実際より多めの値)。同時に1件増えるごとに、約65〜130MB増えた。
+- 1件の処理時間の多くは、通信が止んでから500ミリ秒待つ「ネットワークの静止」の待ち時間で、CPUを使っていない。このため、CPUのコア数(4)を超えて同時に処理しても、処理量は増えた。
+- したがって、上限を決める主な要因は **メモリ** である。
+
+既定の4は、計測の前に置いた控えめな値で、根拠のある値ではない。本番サーバーのメモリと、同時にPDFを要求するオペレーターの数から決める。
+目安: `上限 ≒ (Chromiumに割り当てられるメモリ − 約700MB) ÷ 130MB`。本番サーバー(Windows)でのメモリの使い方はLinuxと異なる可能性があるため、検証環境で計測し直してから既定値を確定する。
+
 ## 未検証の事項(実装時・Windows Server の検証環境で確認する)
 
 - 判定用フォント(cmap format 13 のみ)を、Windows の Chromium が読み込めるか。読み込めない場合は、format 12 で全符号位置を連続した字形に割り当てる形に作り直す(ファイルは大きくなる)。
@@ -294,5 +315,5 @@ HangaException(基底。Stage: 失敗した段階)
 
 ## 決めてほしいこと
 
-- `FitToPageWidth` の既定を `true` にしてよいか。
-- `MaxConcurrentRenders` の既定(4)、`RenderTimeout` の既定(30秒)、余白の既定(上下左右10mm)。
+- `MaxConcurrentRenders` の既定値。本番サーバーのメモリ・CPU、同時にPDFを要求するオペレーターの数(上記「同時に処理する帳票の数」)。
+- `RenderTimeout` の既定(30秒)、余白の既定(上下左右10mm)。

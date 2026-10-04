@@ -62,6 +62,11 @@ namespace DCheck
             await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions { Headless = true, ExecutablePath = chrome, Args = new[] { "--no-sandbox" } });
             Console.WriteLine($"[launch] {await browser.GetVersionAsync()} {sw.ElapsedMilliseconds} ms");
 
+            if (args.Length > 2 && args[2] == "concurrency")
+            {
+                await MeasureConcurrency(browser);
+                return;
+            }
             if (args.Length > 2 && args[2] == "glyphdebug")
             {
                 var p = await OpenAsync(browser, "<html><body><p style='font-family:IPAGothic'>A</p></body></html>");
@@ -197,6 +202,49 @@ namespace DCheck
             await p.Ctx.CloseAsync();
             Console.WriteLine($"[ivs] 葛 vs 葛+E0102 differ: {shots["k0"] != shots["k2"]} / 葛+E0100 vs 葛+E0102 differ: {shots["k0b"] != shots["k2"]} / 辻 vs 辻+E0102 differ: {shots["t0"] != shots["t2"]}");
             Console.WriteLine("[ivs] fonts: " + string.Join(" | ", families));
+        }
+
+        /// <summary>Chromiumのプロセス群(このプログラムが起動したもの)の実メモリ(RSS)の合計(MB)。</summary>
+        private static long ChromiumRssMb()
+        {
+            long kb = 0;
+            foreach (var p in System.Diagnostics.Process.GetProcesses())
+            {
+                try
+                {
+                    if (!p.ProcessName.StartsWith("chrome")) continue;
+                    foreach (var line in System.IO.File.ReadAllLines($"/proc/{p.Id}/status"))
+                        if (line.StartsWith("VmRSS:")) kb += long.Parse(line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)[1]);
+                }
+                catch { }
+            }
+            return kb / 1024;
+        }
+
+        private static async Task MeasureConcurrency(IBrowser browser)
+        {
+            var sb = new StringBuilder("<html><head><style>body{font-family:IPAGothic}</style></head><body><h1>請求書</h1><table>");
+            for (int r = 1; r <= 60; r++) sb.Append($"<tr><td>商品{r}</td><td>{r * 1000}</td></tr>");
+            sb.Append("</table></body></html>");
+            string html = sb.ToString();
+            Console.WriteLine($"[mem] idle browser: {ChromiumRssMb()} MB");
+            foreach (int n in new[] { 1, 2, 4, 8, 16 })
+            {
+                // n件を同時に開いた状態のメモリ
+                var opened = await Task.WhenAll(Enumerable.Range(0, n).Select(_ => OpenAsync(browser, html)));
+                long mem = ChromiumRssMb();
+                foreach (var o in opened) await o.Ctx.CloseAsync();
+                // n件を同時に処理(開く→PDF→閉じる)して、20件を処理し終えるまでの時間
+                var sw = Stopwatch.StartNew();
+                var gate = new System.Threading.SemaphoreSlim(n);
+                await Task.WhenAll(Enumerable.Range(0, 20).Select(async _ =>
+                {
+                    await gate.WaitAsync();
+                    try { var o = await OpenAsync(browser, html); await o.Page.PdfDataAsync(A4()); await o.Ctx.CloseAsync(); }
+                    finally { gate.Release(); }
+                }));
+                Console.WriteLine($"[conc] {n,2} at once: chromium RSS {mem} MB / 20 reports in {sw.ElapsedMilliseconds} ms ({sw.ElapsedMilliseconds / 20} ms per report)");
+            }
         }
 
         private static async Task CheckReuseTiming(IBrowser browser)
