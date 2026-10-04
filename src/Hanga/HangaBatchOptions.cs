@@ -38,6 +38,15 @@ namespace Hanga
         /// <summary>バッチ用の変換器の依存性注入への追加の登録(ビューが <c>@inject</c> で使うサービス、ログの出力先など。要件2.5)。</summary>
         public Action<IServiceCollection>? ConfigureServices { get; set; }
 
+        /// <summary>
+        /// アプリの名前(ビューの自動の発見と、静的Webアセットの一覧の探索に使う)。既定はバッチの実行ファイル(エントリのアセンブリ)の名前。
+        /// テストから、テスト用のホスト(testhost)の代わりの名前を指定するために使う。
+        /// </summary>
+        internal string? ApplicationName { get; set; }
+
+        /// <summary>アプリの名前(<see cref="ApplicationName"/>、無ければエントリのアセンブリの名前)。</summary>
+        internal string ResolvedApplicationName => ApplicationName ?? Assembly.GetEntryAssembly()?.GetName().Name ?? string.Empty;
+
         /// <summary>コンテンツのルート(絶対パス)。</summary>
         internal string ResolvedContentRootPath => Path.GetFullPath(string.IsNullOrWhiteSpace(ContentRootPath) ? AppContext.BaseDirectory : ContentRootPath!);
 

@@ -46,7 +46,8 @@ Hanga/
 │   ├── Hanga.TestReports/   # テスト用の帳票ライブラリ(Razor クラスライブラリ。バッチのテストで使う)
 │   └── Hanga.TestSupport/   # テストの共通部品(Chromium の場所、PDF の読み取り)
 ├── samples/
-│   └── Hanga.Sample/        # サンプルアプリ(使い方の例と、検証ツールの対象)
+│   ├── Hanga.Sample/        # サンプルアプリ(使い方の例と、検証ツールの対象)
+│   └── Hanga.EdgeCases/     # エッジケースの検証(不具合が起きやすい帳票・使い方を、バッチの形で生成して期待どおりかを表にする)
 ├── tools/
 │   ├── Hanga.ChromiumCheck/ # Chromium 更新前の検証ツール
 │   └── probe-fonts/         # 判定用フォントの生成スクリプト(Python + fontTools)

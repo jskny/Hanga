@@ -1,0 +1,5 @@
+@model EdgeModel
+@* オペレーターの情報・要求のクエリを使う画面(バッチでは値が無い) *@
+<p>ユーザー: @(User.Identity?.Name ?? "(なし)")</p>
+<p>認証済み: @(User.Identity?.IsAuthenticated == true ? "はい" : "いいえ")</p>
+<p>クエリ: [@Context.Request.Query["id"]]</p>

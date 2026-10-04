@@ -64,6 +64,25 @@ namespace Hanga.Tests
         }
 
         [Fact]
+        public async Task ビューのアセンブリを指定しなければ実行ファイルが参照するライブラリのビューを使う()
+        {
+            // 要件2.2(エッジケースの検証で見つかった不具合): アプリの名前が Hanga になり、自動ではビューが見つからなかった。
+            // ビューの自動の発見はアプリの名前のアセンブリ(と関連するビューのアセンブリ)から始まる。テストでは実行ファイルが testhost になるため、
+            // 帳票ライブラリをアプリの名前として与え、ViewAssemblies を指定せずにビューが見つかることを確かめる
+            // (Web の SDK のバッチが参照するライブラリを見つけることは、samples/Hanga.EdgeCases の実行で確かめる)
+            await using var batch = await HangaBatch.StartAsync(HangaBatchFixture.NewOptions(), b =>
+            {
+                b.ApplicationName = typeof(InvoiceModel).Assembly.GetName().Name;
+                b.StaticFileMappings["/_content/Hanga.TestReports"] = HangaBatchFixture.TestReportsWwwroot;
+            });
+
+            var env = batch.Services.GetRequiredService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+            Assert.Equal("Hanga.TestReports", env.ApplicationName);
+            string text = PdfInspector.Read(await new Cshtml2Pdf(batch, "Invoice", "Invoice", HangaBatchFixture.Invoice("自動")).ToBytesAsync()).AllText;
+            Assert.Contains("宛名: 自動 様", text);
+        }
+
+        [Fact]
         public async Task 帳票ごとにスコープを作り非同期で破棄する()
         {
             // 要件2.4, 2.5: IAsyncDisposable だけを実装したスコープのサービスも、帳票ごとに作られて破棄される

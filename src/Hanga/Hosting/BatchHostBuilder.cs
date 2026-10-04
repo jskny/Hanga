@@ -82,6 +82,11 @@ namespace Hanga.Hosting
                             endpoints.MapDefaultControllerRoute();
                         });
                     });
+
+                    // Configure は、渡した処理を書いたアセンブリ(Hanga)をアプリの名前にしてしまう。アプリの名前は、ビューの自動の発見
+                    // (アプリが参照するライブラリ)と、開発中の実行での静的Webアセットの一覧(<名前>.StaticWebAssets.xml)の探索に使われるため、
+                    // バッチの実行ファイルの名前に戻す(Configure の後に設定する。エッジケースの検証で見つかった不具合)
+                    web.UseSetting(WebHostDefaults.ApplicationKey, batchOptions.ResolvedApplicationName);
                 })
                 .Build();
         }

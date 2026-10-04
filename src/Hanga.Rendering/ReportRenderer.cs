@@ -118,7 +118,13 @@ namespace Hanga.Rendering
                     ThrowIfStrict(page.Warnings, strict);
 
                     stage = HangaStage.PdfOutput;
-                    byte[] pdf = await deadline.RunAsync(PdfPrinter.PrintAsync(page.Page, options), "PDF の出力", page).ConfigureAwait(false);
+                    (byte[] pdf, HangaWarning? layoutWarning) = await deadline.RunAsync(PdfPrinter.PrintAsync(page.Page, options), "PDF の出力", page).ConfigureAwait(false);
+                    if (layoutWarning != null)
+                    {
+                        // 体裁の警告は PDF の出力の後に分かる。厳格な扱いではここでエラーにする(要件5.5, 8.7)
+                        page.AddWarning(layoutWarning);
+                        ThrowIfStrict(page.Warnings, strict);
+                    }
 
                     var warnings = page.Warnings;
                     if (warnings.Count > 0)

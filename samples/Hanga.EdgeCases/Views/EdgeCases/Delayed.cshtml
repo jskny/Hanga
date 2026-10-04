@@ -1,0 +1,6 @@
+@model EdgeModel
+@* 3 秒後に描画する画面(完了条件の式で待つ) *@
+<p id="v">読み込み中</p>
+@section Scripts {
+    <script>setTimeout(function () { document.getElementById("v").textContent = "遅れて描画した値"; window.reportReady = true; }, 3000);</script>
+}

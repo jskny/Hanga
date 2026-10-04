@@ -63,6 +63,7 @@ dotnet format
 - `src/` — `Hanga.Core`(例外・設定) / `Hanga.Templating`(ビューの HTML 化) / `Hanga.Rendering`(Chromium による PDF 化) / `Hanga`(公開 API と ASP.NET Core との接続、バッチ用のホスト)
 - `tests/` — ユニットテストと、テスト用アプリ(`Hanga.TestApp`)・テスト用の帳票ライブラリ(`Hanga.TestReports`。バッチ用)を使った結合テスト
 - `samples/Hanga.Sample` — サンプルアプリ(使い方の例と、検証ツールの対象)
+- `samples/Hanga.EdgeCases` — エッジケースの検証(大量の明細・特殊な文字・ダイアログ・無限ループ・並行した保存など)
 - `tools/Hanga.ChromiumCheck` — Chromium 更新前の検証ツール、`tools/probe-fonts` — 字形の確認に使うフォントの生成
 - `docs/` — 利用の手引き・検証手順・PDF 出力方式の検証レポート・開発環境メモ
 - `.kiro/` — 方針(steering)と仕様(specs)

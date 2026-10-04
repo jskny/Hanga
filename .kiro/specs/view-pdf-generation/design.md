@@ -279,7 +279,18 @@ HangaException(基底。Stage: 失敗した段階)
 ```
 
 - `Stage`: `ViewRendering`・`BrowserLaunch`・`PageLoad`・`ResourceRequest`・`Waiting`・`PdfOutput`・`Configuration`(要件8.2)。
-- 警告 `HangaWarning`: `Kind`(`BlockedExternalRequest`・`ScriptError`・`MissingGlyph`)、`Message`、`Detail`。
+- 警告 `HangaWarning`: `Kind`(`BlockedExternalRequest`・`ScriptError`・`MissingGlyph`・`Dialog`・`BlockedNavigation`・`SinglePageOverflow`)、`Message`、`Detail`。
+
+### エッジケースの検証を受けて加えた設計(2026年10月4日)
+
+`samples/Hanga.EdgeCases`(不具合が起きやすい帳票・使い方を集めたサンプル)で見つかった問題に対応した。
+
+- **ダイアログ**(要件4.6): ページの `Dialog` の通知で、ダイアログを「OK」(`prompt` は既定値)で閉じ、警告 `Dialog` を記録する。
+  ダイアログの文言は氏名などを含みうるため、詳細(`Detail`)に入れる(通常のログには出さない。要件8.5)。
+- **ページの移動**(要件2.7): 帳票の URL への最初の移動の後、ページ全体(メインフレーム)の移動の要求には 204(No Content)で応え、警告 `BlockedNavigation` を記録する。
+  要求を中断(abort)すると Chromium がエラーページへ移るため、ブラウザが元のページに留まる 204 を使う。内側のフレーム(`iframe`)の移動は止めない。
+- **1ページ化の上限**(要件5.5): 内容の高さが用紙の上限(5000mm)を超える場合は、上限の高さで出力し(超えた分は次のページ)、警告 `SinglePageOverflow` を記録する。
+  体裁は PDF の出力の段階で決まるため、厳格な扱いのエラーもこの段階で投げる。
 - 例外のメッセージ・警告・ログに、`Cookie` の値やヘッダーの値を含めない。URL はクエリ文字列とフラグメントを除いて載せる(クエリに秘密の値を入れるアプリがありうるため。要件8.5)。
 
 ## Chromium のバージョンアップの検証ツール(要件11)

@@ -204,3 +204,12 @@
     - _Requirements: 9.4_
   - [ ] 14.7 `tools/Hanga.ChromiumCheck` を、運用部門の手順書どおりに実行できること
     - _Requirements: 11_
+
+- [x] 15. エッジケースの検証で見つかった問題への対応(2026-10-04。`samples/Hanga.EdgeCases`)
+  - [x] 15.1 ダイアログ(`alert`・`confirm`・`prompt`)を「OK」で閉じて警告にする
+    - _Requirements: 4.6, 8.6, 8.7_
+  - [x] 15.2 帳票を開いた後のページ全体の移動を止めて、元のページを PDF にし、警告にする
+    - _Requirements: 2.7, 8.6, 8.7_
+  - [x] 15.3 1ページ化で用紙の高さの上限を超えた場合に警告にする
+    - _Requirements: 5.5, 8.6, 8.7_
+  - [x] 15.4 回帰テスト(`tests/Hanga.Rendering.Tests/EdgeCaseTests.cs`)

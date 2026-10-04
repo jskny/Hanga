@@ -1,0 +1,11 @@
+@model EdgeModel
+@* 大量の明細(複数ページ・1ページ化) *@
+<h1>大量の明細(@Model.Rows 行)</h1>
+<table>
+    <tr><th>番号</th><th>品名</th><th>金額</th></tr>
+    @for (int i = 1; i <= Model.Rows; i++)
+    {
+        <tr><td>@i</td><td>品名 @i</td><td>@((i * 100).ToString("N0"))</td></tr>
+    }
+</table>
+<p>最終行の次: 明細の終わり</p>

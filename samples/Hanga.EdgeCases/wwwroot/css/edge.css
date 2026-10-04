@@ -1,0 +1,5 @@
+@import url("parts/table.css");
+
+body { font-family: "IPAGothic", "MS PGothic", sans-serif; font-size: 10pt; }
+.mark::after { content: "(CSS適用)"; }
+.with-bg { background-image: url("../img/ロゴ 画像.svg"); background-repeat: no-repeat; padding-left: 40px; min-height: 30px; }

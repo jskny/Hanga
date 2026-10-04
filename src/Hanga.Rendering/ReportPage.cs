@@ -74,6 +74,9 @@ namespace Hanga.Rendering
         private readonly ConcurrentDictionary<IRequest, bool> continuedExternalRequests = new ConcurrentDictionary<IRequest, bool>();
         private long totalResponseBytes;
 
+        /// <summary>ページ全体の移動の要求の数(1 回目は帳票の URL への移動。2 回目以降は止める。要件2.7)。</summary>
+        private int mainFrameNavigations;
+
         private ReportPage(IPage page, ReportPageSetup setup, ILogger logger, CancellationToken cancellationToken)
         {
             Page = page;
@@ -104,6 +107,7 @@ namespace Hanga.Rendering
             page.RequestFailed += (s, e) => reportPage.OnExternalFinished(e.Request, failed: true);
             page.Response += (s, e) => reportPage.OnExternalResponse(e.Response);
             page.PageError += (s, e) => reportPage.AddWarning(new HangaWarning(HangaWarningKind.ScriptError, "ページの JavaScript で例外が発生しました。", e.Message));
+            page.Dialog += reportPage.OnDialog;
             return reportPage;
         }
 
@@ -180,6 +184,23 @@ namespace Hanga.Rendering
             }
         }
 
+        /// <summary>
+        /// ダイアログ(alert・confirm・prompt・beforeunload)は、閉じないとページの JavaScript が止まり、時間切れになる。
+        /// オペレーターが「OK」を押した場合と同じく受け入れて続け、警告として記録する(要件4.6)。内容は氏名などを含みうるため詳細に入れる。
+        /// </summary>
+        private async void OnDialog(object? sender, DialogEventArgs e)
+        {
+            AddWarning(new HangaWarning(HangaWarningKind.Dialog, $"ページの JavaScript がダイアログ({e.Dialog.DialogType})を出したため、「OK」で閉じて続けました。", e.Dialog.Message));
+            try
+            {
+                await e.Dialog.Accept(e.Dialog.DefaultValue).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "ダイアログを閉じられませんでした(ページが閉じられた可能性があります)。");
+            }
+        }
+
         private async void OnRequest(object? sender, RequestEventArgs e)
         {
             // async void のイベントのため、例外を外へ出さない。要求には必ず 1 回だけ応答する
@@ -206,6 +227,16 @@ namespace Hanga.Rendering
 
         private async Task RouteAsync(IRequest request)
         {
+            if (request.IsNavigationRequest && request.Frame == Page.MainFrame && Interlocked.Increment(ref mainFrameNavigations) > 1)
+            {
+                // 帳票を開いた後のページ全体の移動(location.href の変更・フォームの送信・再読み込み)は止め、元のページを PDF にする。
+                // 止めないと、移動先の内容の PDF を黙って返してしまう(要件2.7)。
+                // 要求を中断(abort)すると Chromium がエラーページへ移るため、ブラウザが元のページに留まる 204(No Content)で応える
+                AddWarning(new HangaWarning(HangaWarningKind.BlockedNavigation, "帳票を開いた後に、ページが別の URL へ移動しようとしたため、止めました。", StripQuery(request.Url)));
+                await RespondAsync(request, 204, null, Array.Empty<byte>(), null).ConfigureAwait(false);
+                return;
+            }
+
             if (!Uri.TryCreate(request.Url, UriKind.Absolute, out Uri? uri))
             {
                 await BlockAsync(request).ConfigureAwait(false);

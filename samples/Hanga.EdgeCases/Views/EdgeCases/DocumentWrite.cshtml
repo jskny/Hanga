@@ -1,0 +1,6 @@
+@model EdgeModel
+@* document.write で大量に書き出す画面 *@
+<p>document.write の前</p>
+@section Scripts {
+    <script>for (var i = 1; i <= 500; i++) { document.write("<div>書き出し " + i + "</div>"); }</script>
+}

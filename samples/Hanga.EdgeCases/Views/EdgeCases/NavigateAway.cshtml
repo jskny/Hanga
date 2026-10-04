@@ -1,0 +1,6 @@
+@model EdgeModel
+@* 表示の後に、別の URL へ移動してしまう画面 *@
+<p>移動する前のページ</p>
+@section Scripts {
+    <script>setTimeout(function () { location.href = "/css/edge.css"; }, 100);</script>
+}

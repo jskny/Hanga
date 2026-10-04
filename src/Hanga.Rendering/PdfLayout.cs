@@ -52,6 +52,10 @@ namespace Hanga.Rendering
             return Math.Min(PaperSize.MaxMillimeters, height);
         }
 
+        /// <summary>1 ページにする場合に、内容の高さが用紙の上限を超えて、複数ページになるか(要件5.5。警告にする)。</summary>
+        public static bool SinglePageOverflows(Cshtml2PdfOptions options, double contentHeightPx, double scale) =>
+            PxToMm(contentHeightPx * scale) + options.Margins.Top + options.Margins.Bottom + SinglePageSlackMm > PaperSize.MaxMillimeters;
+
         /// <summary>Chromium に渡す長さの文字列(例: <c>210mm</c>)。文化圏によらず小数点を . にする。</summary>
         public static string Mm(double mm) => mm.ToString("0.###", CultureInfo.InvariantCulture) + "mm";
     }

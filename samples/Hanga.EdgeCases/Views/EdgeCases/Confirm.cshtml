@@ -1,0 +1,6 @@
+@model EdgeModel
+@* 表示時に confirm() を出す画面 *@
+<p id="v">confirm の前</p>
+@section Scripts {
+    <script>var ok = confirm("よろしいですか"); document.getElementById("v").textContent = "confirm の後 " + ok;</script>
+}
