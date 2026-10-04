@@ -38,11 +38,12 @@ Hanga/
 │   ├── Hanga.Templating/    # ビューのHTML化(ViewHtmlRenderer。ASP.NET Core MVC のビュー描画を使う)
 │   ├── Hanga.Rendering/     # HTML→PDF(BrowserHost・ReportPage・ReportRenderer・PdfPrinter・GlyphSupport。PuppeteerSharp 18.1.0。ASP.NET Core に依存しない)
 │   │   └── Fonts/           # 字形の確認に使う判定用フォント(埋め込みリソース。tools/probe-fonts で生成)
-│   └── Hanga/               # 公開API(AddHanga・Cshtml2Pdf・HangaPdfConverter)と ASP.NET Core との接続(Hosting/)
+│   └── Hanga/               # 公開API(AddHanga・Cshtml2Pdf・HangaPdfConverter・HangaBatch)と ASP.NET Core との接続(Hosting/。バッチ用のホストを含む)
 ├── tests/
 │   ├── Hanga.<レイヤー名>.Tests/   # レイヤーごとのテスト(Rendering は Chromium を使う)
 │   ├── Hanga.Tests/         # 公開API・ASP.NET Core との接続・全体の結合テスト
 │   ├── Hanga.TestApp/       # テスト用の ASP.NET Core 5 MVC アプリ(呼び出し元アプリの代わり)
+│   ├── Hanga.TestReports/   # テスト用の帳票ライブラリ(Razor クラスライブラリ。バッチのテストで使う)
 │   └── Hanga.TestSupport/   # テストの共通部品(Chromium の場所、PDF の読み取り)
 ├── samples/
 │   └── Hanga.Sample/        # サンプルアプリ(使い方の例と、検証ツールの対象)
@@ -73,6 +74,7 @@ Hanga/
 
 1. 帳票のビュー(`.cshtml`)を作る(画面用のビューをそのまま使ってよい)。
 2. コントローラーに PDF 用のアクションを追加し、`new Cshtml2Pdf(this, ビュー名, モデル)` で PDF を返す。
+   バッチで使う帳票は、ビューと静的ファイルを帳票ライブラリ(Razor クラスライブラリ)に置き、バッチから `new Cshtml2Pdf(batch, コントローラー名, ビュー名, モデル)` で保存する。
 3. 用紙サイズ・向き・余白などを `pdf.Options` で指定する。
 4. ライブラリの対応範囲で表現できない要件がある場合のみ、`.kiro/specs/` に要件を追記し、ライブラリを拡張する。
 

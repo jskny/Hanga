@@ -246,6 +246,30 @@ ASP.NET Core の列は、自己完結型で発行した ASP.NET Core 5.0.17 上�
   - 今回はWebアプリと同じ実行ファイルをバッチの引数で動かした。バッチを別の実行ファイルにする場合は、ビューを共有する方法(Razorクラスライブラリにまとめる等)が必要になる。
   - 今回は帳票ごとにChromiumを起動した。大量に生成する場合は、Chromiumの起動を使い回すことを設計で検討する。
 
+### 6.5 Webアプリとは別の実行ファイル(バッチ)での生成
+
+6.4 は、Webアプリと同じ実行ファイルをバッチの引数で動かした。利用部門の回答(2026年10月4日)で、バッチは **Webアプリとは別の実行ファイル** にすることになったため、
+帳票のビューと静的ファイルを Razor クラスライブラリ(以下、帳票ライブラリ)にまとめ、別の実行ファイルから使えるかを確かめた
+(`spikes/batch-rcl-verification/`。`Reports` が帳票ライブラリ、`Batch`・`BatchWeb` がバッチ)。
+
+- **確かめた内容**: Webサーバーを起動せずに(6.4 と同じ「何もしないサーバー」)、帳票ライブラリのビュー(帳票用のレイアウト・`_ViewStart`・`_ViewImports`・`asp-append-version`)を HTML にし、
+  ビューが読み込む `~/_content/Reports/css/report.css` を、パイプラインにプロセス内で要求して取得できるか。
+- **結果**(.NET SDK 10.0.112 で `net5.0` 向けにビルド。帳票ライブラリは `Microsoft.NET.Sdk.Razor`・`AddRazorSupportForMvc`):
+
+| バッチの SDK | 実行のしかた | ビューの発見 | `/_content/Reports/css/report.css` |
+|---|---|---|---|
+| `Microsoft.NET.Sdk` | ビルドの出力 | 自動では見つからない。アセンブリを指定すれば見つかる | 404(静的Webアセットの一覧が作られない) |
+| `Microsoft.NET.Sdk` | 発行 | 同上 | 404(`wwwroot/css/report.css` に置かれ、`_content` の下に無い) |
+| `Microsoft.NET.Sdk.Web` | ビルドの出力、.NET 5.0.17 のランタイム(自己完結型) | 自動で見つかる | 200(静的Webアセットの一覧 `BatchWeb.StaticWebAssets.xml` から) |
+| `Microsoft.NET.Sdk.Web` | ビルドの出力、.NET 10 のランタイム(`RollForward`) | 自動で見つかる | 404(.NET 10 は新しい形式の一覧しか読まない) |
+| `Microsoft.NET.Sdk.Web` | 発行 | 自動で見つかる | 200(`wwwroot/_content/Reports/css/report.css`)。`asp-append-version` も付いた |
+
+- **わかったこと・設計への反映**(`.kiro/specs/batch-pdf-generation/design.md`):
+  - バッチは `Microsoft.NET.Sdk.Web` で作れば、ビューも静的Webアセットも Webアプリと同じ形で使える。出力はコンソールアプリで、Webサーバーは起動しない。
+  - 帳票ライブラリのビューは、.NET 5 の Razor SDK では別のアセンブリ(`Reports.Views.dll`)にコンパイルされる。ビューのアセンブリを明示的に加える場合は、関連するビューのアセンブリも加える必要がある。
+  - .NET 10 のランタイムで動かした場合の 404 は、テスト(`RollForward` で .NET 10 のランタイムで動く)だけの事情である。テストでは、静的ファイルのフォルダを明示して与える。
+  - 帳票のレイアウトは帳票ライブラリに置く必要がある(Webアプリの `_Layout.cshtml` はバッチから見えない)。
+
 ## 7. 外字・異体字の検証
 
 検証日: 2026年10月3日
