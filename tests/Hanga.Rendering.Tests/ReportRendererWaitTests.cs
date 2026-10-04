@@ -107,10 +107,11 @@ namespace Hanga.Rendering.Tests
         {
             var global = BrowserHostTests.Options();
             configureGlobal?.Invoke(global);
-            await using var host = new BrowserHost(global);
+            var glyphs = new GlyphSupport(global);
+            await using var host = new BrowserHost(global, afterLaunch: glyphs.VerifyGaijiFontAsync);
             var options = new Cshtml2PdfOptions();
             configure?.Invoke(options);
-            return await new ReportRenderer(host, global).RenderAsync(new ReportRenderInput(html, options, handler));
+            return await new ReportRenderer(host, global, glyphs).RenderAsync(new ReportRenderInput(html, options, handler));
         }
     }
 }

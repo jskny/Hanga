@@ -22,13 +22,18 @@ namespace Hanga.Rendering
         private readonly ILogger logger;
         private readonly SemaphoreSlim launchLock = new SemaphoreSlim(1, 1);
         private readonly SemaphoreSlim renderSlots;
+        private readonly Func<IBrowser, Task>? afterLaunch;
         private IBrowser? browser;
         private string? userDataDir;
         private bool disposed;
 
-        public BrowserHost(HangaOptions options, ILogger<BrowserHost>? logger = null)
+        /// <param name="options">アプリ全体の設定。</param>
+        /// <param name="logger">記録先。</param>
+        /// <param name="afterLaunch">起動の直後に行う確認(外字用フォントの有無など。要件6.6)。例外を投げると起動の失敗として扱う。</param>
+        public BrowserHost(HangaOptions options, ILogger<BrowserHost>? logger = null, Func<IBrowser, Task>? afterLaunch = null)
         {
             this.options = options;
+            this.afterLaunch = afterLaunch;
             this.logger = (ILogger?)logger ?? NullLogger.Instance;
             renderSlots = new SemaphoreSlim(options.MaxConcurrentRenders, options.MaxConcurrentRenders);
         }
@@ -160,6 +165,7 @@ namespace Hanga.Rendering
             // プロセスごとの一時ユーザーデータフォルダ。終了時に削除する
             userDataDir = Path.Combine(Path.GetTempPath(), "hanga-chromium-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(userDataDir);
+            IBrowser? launched = null;
             try
             {
                 var launchOptions = new LaunchOptions
@@ -169,16 +175,40 @@ namespace Hanga.Rendering
                     UserDataDir = userDataDir,
                     Args = options.ChromiumArguments.ToArray(),
                 };
-                IBrowser launched = await Puppeteer.LaunchAsync(launchOptions).ConfigureAwait(false);
+                launched = await Puppeteer.LaunchAsync(launchOptions).ConfigureAwait(false);
                 BrowserVersion = await launched.GetVersionAsync().ConfigureAwait(false);
                 LaunchCount++;
                 logger.LogInformation("Chromium を起動しました(版: {Version}、場所: {Path})。", BrowserVersion, path);
+                if (afterLaunch != null)
+                {
+                    await afterLaunch(launched).ConfigureAwait(false);
+                }
+
                 return launched;
             }
             catch (Exception ex)
             {
+                if (launched != null)
+                {
+                    try
+                    {
+                        await launched.CloseAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception closeEx)
+                    {
+                        logger.LogDebug(closeEx, "起動の後の確認に失敗した Chromium を終了できませんでした。");
+                    }
+
+                    launched.Dispose();
+                }
+
                 DeleteUserDataDir();
-                throw new HangaBrowserException("Chromium を起動できませんでした。", path, null, HangaStage.BrowserLaunch, ex);
+                if (ex is HangaException)
+                {
+                    throw;
+                }
+
+                throw new HangaBrowserException("Chromium を起動できませんでした。", path, BrowserVersion, HangaStage.BrowserLaunch, ex);
             }
         }
 

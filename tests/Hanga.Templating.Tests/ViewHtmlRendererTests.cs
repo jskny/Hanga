@@ -108,7 +108,7 @@ namespace Hanga.Templating.Tests
             http.Request.Scheme = "https";
             http.Request.Host = new HostString("localhost");
             // エンドポイントルーティングで URL を生成させるため、ダミーのエンドポイントを設定する(検証レポート「6.4」)
-            http.SetEndpoint(new Endpoint(null, EndpointMetadataCollection.Empty, "test"));
+            http.SetEndpoint(new Endpoint(_ => Task.CompletedTask, EndpointMetadataCollection.Empty, "test"));
             return http;
         }
     }

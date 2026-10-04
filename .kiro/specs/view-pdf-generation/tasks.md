@@ -110,18 +110,18 @@
   - [x] 7.4 7.2〜7.3 のテスト(Chromiumを使う): ページサイズ(±1pt)、横向き、印刷用CSS、幅の広い表が欠けないこと、1ページ化、ページ番号、タイトル、文字列を取り出せること
     - _Requirements: 2.5, 5.1〜5.9_
 
-- [ ] 8. Rendering: 外字・異体字・字形の無い文字
-  - [ ] 8.1 外字用フォントの注入: `@font-face`(`local()` または `/__hanga/gaiji` のファイル)と `unicode-range`、全要素の `font-family` の末尾への追加。表示の完了の後に実行する
+- [x] 8. Rendering: 外字・異体字・字形の無い文字
+  - [x] 8.1 外字用フォントの注入: `@font-face`(`local()` または `/__hanga/gaiji` のファイル)と `unicode-range`、全要素の `font-family` の末尾への追加。表示の完了の後に実行する
     - _Requirements: 6.1〜6.3, 6.5, 10.3_
-  - [ ] 8.2 異体字セレクタ付きの文字の包み込み(`HangaGaijiIvs`)
+  - [x] 8.2 異体字セレクタ付きの文字の包み込み(`HangaGaijiIvs`)
     - _Requirements: 6.4_
-  - [ ] 8.3 判定用フォントの生成スクリプトを `tools/probe-fonts/` に置き、生成物を `Hanga.Rendering` の埋め込みリソースにする(`spikes/.../design-checks/make_probe_fonts.py` を元にする)
+  - [x] 8.3 判定用フォントの生成スクリプトを `tools/probe-fonts/` に置き、生成物を `Hanga.Rendering` の埋め込みリソースにする(`spikes/.../design-checks/make_probe_fonts.py` を元にする)
     - _Requirements: 6.7_
-  - [ ] 8.4 字形の無い文字の検出(判定用フォントによる描き比べ)と、警告 `MissingGlyph`(符号位置付き。厳格ならエラー)
+  - [x] 8.4 字形の無い文字の検出(判定用フォントによる描き比べ)と、警告 `MissingGlyph`(符号位置付き。厳格ならエラー)
     - _Requirements: 6.7_
-  - [ ] 8.5 外字用フォントが無い場合のエラー: ファイルの指定は登録時、名前の指定はChromiumの起動時に確かめる
+  - [x] 8.5 外字用フォントが無い場合のエラー: ファイルの指定は登録時、名前の指定はChromiumの起動時に確かめる
     - _Requirements: 6.6_
-  - [ ] 8.6 8.1〜8.5 のテスト(Chromiumを使う。IPAmj明朝が必要): 「𠮷」が外字用フォントで描かれること、「葛+U+E0102」が異なる字形になること、字形の無い文字の検出、フォントが無い場合のエラー
+  - [x] 8.6 8.1〜8.5 のテスト(Chromiumを使う。IPAmj明朝が必要): 「𠮷」が外字用フォントで描かれること、「葛+U+E0102」が異なる字形になること、字形の無い文字の検出、フォントが無い場合のエラー
     - _Requirements: 6.1〜6.7_
 
 - [ ] 9. Hanga: ASP.NET Core との接続

@@ -56,12 +56,14 @@ namespace Hanga.Rendering
     {
         private readonly BrowserHost host;
         private readonly HangaOptions global;
+        private readonly GlyphSupport glyphs;
         private readonly ILogger logger;
 
-        public ReportRenderer(BrowserHost host, HangaOptions global, ILogger? logger = null)
+        public ReportRenderer(BrowserHost host, HangaOptions global, GlyphSupport glyphs, ILogger? logger = null)
         {
             this.host = host;
             this.global = global;
+            this.glyphs = glyphs;
             this.logger = logger ?? NullLogger.Instance;
         }
 
@@ -86,6 +88,7 @@ namespace Hanga.Rendering
             {
                 AllowedExternalHosts = global.AllowedExternalHosts,
                 MaxResponseBodyBytes = global.MaxResponseBodyBytes,
+                Resources = glyphs.Resources,
             };
             ReportPage page = await ReportPage.CreateAsync(lease, setup, logger, cancellationToken).ConfigureAwait(false);
 
@@ -95,6 +98,14 @@ namespace Hanga.Rendering
             {
                 // 必要な値が欠けた PDF を返さないため、設定によらずエラーにする(要件3.5, 8.4)
                 throw new HangaResourceRequestException(page.FailedRequests);
+            }
+
+            // 外字・異体字・字形の無い文字(要件6)。API から取得した値が描画された後に行う
+            await deadline.RunAsync(glyphs.ApplyAsync(page.Page), "外字用フォントの適用", page).ConfigureAwait(false);
+            HangaWarning? missingGlyphs = await deadline.RunAsync(glyphs.FindMissingGlyphsAsync(page.Page), "字形の確認", page).ConfigureAwait(false);
+            if (missingGlyphs != null)
+            {
+                page.AddWarning(missingGlyphs);
             }
 
             ThrowIfStrict(page.Warnings, strict);

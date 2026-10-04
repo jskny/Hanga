@@ -19,6 +19,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 字形の無い文字の検出に使う判定用フォント(tools/probe-fonts/ で生成。design.md「⑧」) -->
+    <EmbeddedResource Include="Fonts\probe-a.ttf" LogicalName="Hanga.Rendering.Fonts.probe-a.ttf" />
+    <EmbeddedResource Include="Fonts\probe-b.ttf" LogicalName="Hanga.Rendering.Fonts.probe-b.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Hanga.Core\Hanga.Core.csproj" />
   </ItemGroup>
 
