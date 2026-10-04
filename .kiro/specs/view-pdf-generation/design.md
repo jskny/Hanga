@@ -121,6 +121,7 @@ public async Task<IActionResult> OrderPdf(int id)
 | `GaijiFontFamily` / `GaijiFontFile` | 未指定 | 外字用フォント(名前 または ファイル。要件6.1) |
 | `DetectMissingGlyphs` | `true` | 字形の無い文字を検出する(要件6.7) |
 | `Strict` | `false` | 警告の対象をエラーにする(要件8.7) |
+| `MaxResponseBodyBytes` | 50MB | 仮想オリジンへの要求1件の応答の大きさの上限(メモリを使い尽くさないための安全弁。下記「⑤⑥」) |
 | `VirtualOrigin` | `https://hanga.invalid` | 仮想オリジン(`.invalid` はRFC 6761で実在しないことが保証されたドメイン) |
 
 `Cshtml2PdfOptions`(帳票1件ごと)

@@ -34,18 +34,19 @@
     - 注記: この開発環境では実行できない。初回の実行結果(Actions のログ)で成否を確かめる。
   - [x] 1.8 `.claude/agents/` に、Utsushi のサブエージェント定義(code-investigator・code-reviewer・test-writer・security-reviewer・spec-compliance-reviewer・doc-reviewer)を Hanga 向けに書き換えて置き、`CLAUDE.md` の「サブエージェント」を更新する
 
-- [ ] 2. Core: 共通の型
-  - [ ] 2.1 例外の基底 `HangaException`(段階 `Stage`)と派生7種(`design.md`「例外と警告」)を作る
+- [x] 2. Core: 共通の型
+  - [x] 2.1 例外の基底 `HangaException`(段階 `Stage`)と派生7種(`design.md`「例外と警告」)を作る
     - _Requirements: 8.1, 8.2_
-  - [ ] 2.2 警告 `HangaWarning`(`Kind`・`Message`・`Detail`)を作る
+  - [x] 2.2 警告 `HangaWarning`(`Kind`・`Message`・`Detail`)を作る
     - _Requirements: 8.6_
-  - [ ] 2.3 用紙サイズ `PaperSize`(A3・A4・A5・B4・B5・Letter・Legal・`Custom(幅mm, 高さmm)`)、`PageOrientation`、`PageMargins`、`CssMedia` を作る
+  - [x] 2.3 用紙サイズ `PaperSize`(A3・A4・A5・B4・B5・Letter・Legal・`Custom(幅mm, 高さmm)`)、`PageOrientation`、`PageMargins`、`CssMedia` を作る
     - _Requirements: 5.1, 5.2_
-  - [ ] 2.4 アプリ全体の設定 `HangaOptions` を、`design.md` の既定値どおりに作り、値の検証(範囲外は `HangaConfigurationException`)を実装する
+  - [x] 2.4 アプリ全体の設定 `HangaOptions` を、`design.md` の既定値どおりに作り、値の検証(範囲外は `HangaConfigurationException`)を実装する
     - _Requirements: 4.3, 8.7, 9.4, 12.6_
-  - [ ] 2.5 帳票1件ごとの設定 `Cshtml2PdfOptions` を作り、`Timeout`・`Strict` をアプリ全体の設定で補う処理(実際に使う値を決める処理)を実装する
+    - 注記: 応答の大きさの上限 `MaxResponseBodyBytes`(既定 50MB)もオプションにした(design.md のオプション表に追記)。
+  - [x] 2.5 帳票1件ごとの設定 `Cshtml2PdfOptions` を作り、`Timeout`・`Strict` をアプリ全体の設定で補う処理(実際に使う値を決める処理)を実装する
     - _Requirements: 4.3, 5, 8.7_
-  - [ ] 2.6 2.1〜2.5 のユニットテスト
+  - [x] 2.6 2.1〜2.5 のユニットテスト
 
 - [ ] 3. Templating: ビューのHTML化
   - [ ] 3.1 `ViewHtmlRenderer`: `ActionContext` を作り、`IRazorViewEngine.FindView` でビューを探し、`StringWriter` に描画する基本の処理
