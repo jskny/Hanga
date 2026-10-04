@@ -87,11 +87,11 @@ namespace Hanga.Rendering.Tests
             var handler = new FakeVirtualOriginHandler()
                 .Text("/api/error", "text/plain", "error", status: 500)
                 .Text("/api/login", "text/plain", "", status: 302, headers: new Dictionary<string, string> { ["Location"] = "/Account/Login" });
-            string html = "<html><body><script>fetch('/api/error'); fetch('/api/login', { redirect: 'manual' });</script></body></html>";
+            string html = "<html><body><script>fetch('/api/error?token=secret'); fetch('/api/login', { redirect: 'manual' });</script></body></html>";
 
             await RunAsync(html, handler, page =>
             {
-                Assert.Contains(page.FailedRequests, f => f.Url == Origin + "/api/error" && f.StatusCode == 500);
+                Assert.Contains(page.FailedRequests, f => f.Url == Origin + "/api/error" && f.StatusCode == 500); // クエリは載せない(要件8.5)
                 Assert.Contains(page.FailedRequests, f => f.Url == Origin + "/api/login" && f.StatusCode == 302);
                 return Task.CompletedTask;
             });

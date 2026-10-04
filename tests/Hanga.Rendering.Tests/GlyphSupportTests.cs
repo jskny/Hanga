@@ -114,8 +114,9 @@ namespace Hanga.Rendering.Tests
             return FontFamily(document.GetPage(1).Letters.First(l => l.Value == ch).FontName);
         }
 
-        private static string FontFamily(string fontName)
+        private static string FontFamily(string? fontName)
         {
+            fontName ??= string.Empty;
             string name = fontName.Contains('+') ? fontName.Substring(fontName.IndexOf('+') + 1) : fontName;
             return name.StartsWith("IPAmj", StringComparison.Ordinal) ? "IPAmj" : name.StartsWith("IPAGothic", StringComparison.Ordinal) ? "IPAGothic" : name;
         }

@@ -277,7 +277,7 @@ HangaException(基底。Stage: 失敗した段階)
 
 - `Stage`: `ViewRendering`・`BrowserLaunch`・`PageLoad`・`ResourceRequest`・`Waiting`・`PdfOutput`・`Configuration`(要件8.2)。
 - 警告 `HangaWarning`: `Kind`(`BlockedExternalRequest`・`ScriptError`・`MissingGlyph`)、`Message`、`Detail`。
-- 例外のメッセージ・警告に、`Cookie` の値やヘッダーの値を含めない。URLはクエリ文字列を含めて記録するため、クエリに秘密情報を入れるアプリでは注意が必要(要件8.5。利用の手引きに書く)。
+- 例外のメッセージ・警告・ログに、`Cookie` の値やヘッダーの値を含めない。URL はクエリ文字列とフラグメントを除いて載せる(クエリに秘密の値を入れるアプリがありうるため。要件8.5)。
 
 ## Chromium のバージョンアップの検証ツール(要件11)
 
@@ -334,6 +334,18 @@ HangaException(基底。Stage: 失敗した段階)
 本番サーバーのメモリと、同時にPDFを要求するオペレーターの数に合わせて、設定ファイルで変える。
 目安: `上限 ≒ (Chromiumに割り当てられるメモリ − 約700MB) ÷ 130MB`。本番サーバー(Windows)でのメモリの使い方はLinuxと異なる可能性があるため、検証環境で計測し直して調整する。
 調整の手順は、利用の手引き(`docs/ライブラリの使い方.md`)に書く。
+
+### 処理時間の目安(要件10.4)
+
+2026年10月4日、この開発環境(CPU 4コア、Linux、Chrome 141)で、テスト用アプリの PDF 用アクション(`/Pdf/Order`。レイアウト・外部CSS・JavaScript・
+ログインが必要なAPIからの値の取得を含む)を呼んで計測した(`tests/Hanga.Tests/PerformanceTests.cs`)。
+
+| 場合 | 時間 |
+|---|---|
+| 初回(Chromium の起動を含む) | 約1.9秒 |
+| 2回目以降(ビューのHTML化・APIの処理・ページの表示・PDF化を含む) | 約1.2秒/件 |
+
+1件の時間の多くは、通信が止んでから 500 ミリ秒待つ「ネットワークの静止」の待ち時間である(上記「同時に処理する帳票の数」)。
 
 ## 未検証の事項(実装時・Windows Server の検証環境で確認する)
 

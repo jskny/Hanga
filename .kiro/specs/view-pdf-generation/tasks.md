@@ -124,42 +124,44 @@
   - [x] 8.6 8.1〜8.5 のテスト(Chromiumを使う。IPAmj明朝が必要): 「𠮷」が外字用フォントで描かれること、「葛+U+E0102」が異なる字形になること、字形の無い文字の検出、フォントが無い場合のエラー
     - _Requirements: 6.1〜6.7_
 
-- [ ] 9. Hanga: ASP.NET Core との接続
-  - [ ] 9.1 `AddHanga`(コードで指定・設定ファイルから読む・両方)と、登録時の値の検証
+- [x] 9. Hanga: ASP.NET Core との接続
+  - [x] 9.1 `AddHanga`(コードで指定・設定ファイルから読む・両方)と、登録時の値の検証
     - _Requirements: 12.5, 12.6_
-  - [ ] 9.2 パイプラインを捕まえる `IStartupFilter` と、保持するシングルトン
+  - [x] 9.2 パイプラインを捕まえる `IStartupFilter` と、保持するシングルトン
     - _Requirements: 3.1, 12.5_
-  - [ ] 9.3 `RequestSnapshot`: 元の要求から `Cookie`・`Host`・スキーム・パスベース・`Accept-Language`・`IServiceScopeFactory` を写し取る
+  - [x] 9.3 `RequestSnapshot`: 元の要求から `Cookie`・`Host`・スキーム・パスベース・`Accept-Language`・`IServiceScopeFactory` を写し取る
     - _Requirements: 3.2, 3.3, 9.3_
-  - [ ] 9.4 `PipelineForwarder`(`IVirtualOriginHandler` の実装): 要求ごとのスコープと `DefaultHttpContext` を作り、パイプラインを呼んで応答を返す(応答の大きさの上限付き)
+  - [x] 9.4 `PipelineForwarder`(`IVirtualOriginHandler` の実装): 要求ごとのスコープと `DefaultHttpContext` を作り、パイプラインを呼んで応答を返す(応答の大きさの上限付き)
     - _Requirements: 3.1〜3.3, 3.8_
-  - [ ] 9.5 アプリの停止時にChromiumを終了し、`LaunchOnStartup` なら起動時にChromiumを起動する `IHostedService`
+  - [x] 9.5 アプリの停止時にChromiumを終了し、`LaunchOnStartup` なら起動時にChromiumを起動する `IHostedService`
     - _Requirements: 10.2_
-  - [ ] 9.6 9.1〜9.5 のテスト(`Hanga.TestApp` を使う): 設定ファイルからの読み込みと不正な値、静的ファイルとAPIがパイプラインで処理されること、Cookie の引き継ぎ
+  - [x] 9.6 9.1〜9.5 のテスト(`Hanga.TestApp` を使う): 設定ファイルからの読み込みと不正な値、静的ファイルとAPIがパイプラインで処理されること、Cookie の引き継ぎ
     - _Requirements: 3.1〜3.3, 12.5, 12.6_
 
-- [ ] 10. Hanga: 公開API
-  - [ ] 10.1 `HangaPdfConverter`(共有の変換器): ビューのHTML化からPDF化までをつなぎ、`HangaPdfDocument`(PDF・警告・Chromiumの版・所要時間)を返す。警告を `ILogger` に記録する
+- [x] 10. Hanga: 公開API
+  - [x] 10.1 `HangaPdfConverter`(共有の変換器): ビューのHTML化からPDF化までをつなぎ、`HangaPdfDocument`(PDF・警告・Chromiumの版・所要時間)を返す。警告を `ILogger` に記録する
     - _Requirements: 8.4, 8.6, 9.1_
-  - [ ] 10.2 `Cshtml2Pdf`: コンストラクター(コントローラーから / `HttpContext` から)、`Options`、`GenerateAsync`・`ToBytesAsync`・`WriteToAsync`・`SaveAsync`
+  - [x] 10.2 `Cshtml2Pdf`: コンストラクター(コントローラーから / `HttpContext` から)、`Options`、`GenerateAsync`・`ToBytesAsync`・`WriteToAsync`・`SaveAsync`
     - _Requirements: 1.3, 7.1, 9.1_
-  - [ ] 10.3 `ToActionResultAsync`: `inline`/`attachment` と、日本語のファイル名(`filename*` と ASCII の代替名)
+  - [x] 10.3 `ToActionResultAsync`: `inline`/`attachment` と、日本語のファイル名(`filename*` と ASCII の代替名)
     - _Requirements: 7.2〜7.4_
-  - [ ] 10.4 例外のメッセージ・警告に `Cookie` などの値が入らないことの確認(全例外・全警告の組み立て箇所を見直す)
+  - [x] 10.4 例外のメッセージ・警告に `Cookie` などの値が入らないことの確認(全例外・全警告の組み立て箇所を見直す)
     - _Requirements: 8.5_
-  - [ ] 10.5 10.1〜10.4 のテスト: `Content-Disposition` の組み立て(ユニット)、PDF用アクションからの生成(`Hanga.TestApp`、Chromiumを使う)
+    - 注記: 失敗した要求の URL とログにクエリ文字列が残っていたため、例外・警告・ログに載せる URL はすべてクエリ文字列を除く形にそろえた(design.md「例外と警告」に反映)。
+  - [x] 10.5 10.1〜10.4 のテスト: `Content-Disposition` の組み立て(ユニット)、PDF用アクションからの生成(`Hanga.TestApp`、Chromiumを使う)
     - _Requirements: 7, 8.5, 8.6_
 
-- [ ] 11. 全体の結合テスト(`Hanga.TestApp`、Chromiumを使う)
-  - [ ] 11.1 Cookie認証のAPIから表示時に取得した値がPDFに入ること
+- [x] 11. 全体の結合テスト(`Hanga.TestApp`、Chromiumを使う)
+  - [x] 11.1 Cookie認証のAPIから表示時に取得した値がPDFに入ること
     - _Requirements: 3.2, 3.8_
-  - [ ] 11.2 ログインが切れた場合(APIがログイン画面へリダイレクト)にエラーになること
+  - [x] 11.2 ログインが切れた場合(APIがログイン画面へリダイレクト)にエラーになること
     - _Requirements: 3.5, 8.4_
-  - [ ] 11.3 8人の同時要求で、各PDFに本人の値だけが入ること(`spikes/.../inproc/concurrent-test.sh` の内容をテストにする)
+    - 注記: Cookie 認証は要求の種類によって 302 ではなく 401 を返すことがある。どちらも失敗として扱うことを確かめた。
+  - [x] 11.3 8人の同時要求で、各PDFに本人の値だけが入ること(`spikes/.../inproc/concurrent-test.sh` の内容をテストにする)
     - _Requirements: 9.1〜9.4_
-  - [ ] 11.4 厳格な扱いの切り替え(アプリ全体の設定と帳票ごとの上書き)
+  - [x] 11.4 厳格な扱いの切り替え(アプリ全体の設定と帳票ごとの上書き)
     - _Requirements: 8.7_
-  - [ ] 11.5 処理時間を計測し、`design.md` に1件あたりの目安として記録する
+  - [x] 11.5 処理時間を計測し、`design.md` に1件あたりの目安として記録する
     - _Requirements: 10.4_
 
 - [ ] 12. Chromium のバージョンアップの検証ツール

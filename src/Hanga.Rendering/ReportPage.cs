@@ -134,8 +134,8 @@ namespace Hanga.Rendering
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Chromium からの要求の処理中にエラーが発生しました: {Method} {Url}", request.Method, request.Url);
-                failedRequests.Enqueue(new FailedRequest(request.Method.ToString().ToUpperInvariant(), request.Url, 0));
+                logger.LogWarning(ex, "Chromium からの要求の処理中にエラーが発生しました: {Method} {Url}", request.Method, StripQuery(request.Url));
+                failedRequests.Enqueue(new FailedRequest(request.Method.ToString().ToUpperInvariant(), StripQuery(request.Url), 0));
                 try
                 {
                     await request.RespondAsync(new ResponseData { Status = HttpStatusCode.InternalServerError, Body = string.Empty }).ConfigureAwait(false);
@@ -184,7 +184,7 @@ namespace Hanga.Rendering
                 }
                 else
                 {
-                    failedRequests.Enqueue(new FailedRequest(Method(request), request.Url, 404));
+                    failedRequests.Enqueue(new FailedRequest(Method(request), StripQuery(request.Url), 404));
                     await RespondAsync(request, 404, null, Array.Empty<byte>(), null).ConfigureAwait(false);
                 }
 
@@ -207,7 +207,7 @@ namespace Hanga.Rendering
             VirtualResponse response = await setup.Handler.HandleAsync(virtualRequest, cancellationToken).ConfigureAwait(false);
             if (response.Body.LongLength > setup.MaxResponseBodyBytes)
             {
-                failedRequests.Enqueue(new FailedRequest(virtualRequest.Method, request.Url, response.StatusCode));
+                failedRequests.Enqueue(new FailedRequest(virtualRequest.Method, StripQuery(request.Url), response.StatusCode));
                 await RespondAsync(request, 502, null, Array.Empty<byte>(), null).ConfigureAwait(false);
                 return;
             }
@@ -215,7 +215,7 @@ namespace Hanga.Rendering
             if (response.StatusCode >= 300)
             {
                 // 300 番台(ログイン画面への転送を含む)・400 以上は失敗として記録し、表示の後にエラーにする(要件3.5)
-                failedRequests.Enqueue(new FailedRequest(virtualRequest.Method, request.Url, response.StatusCode));
+                failedRequests.Enqueue(new FailedRequest(virtualRequest.Method, StripQuery(request.Url), response.StatusCode));
             }
 
             await RespondAsync(request, response.StatusCode, response.ContentType, response.Body, response.Headers).ConfigureAwait(false);
@@ -252,7 +252,7 @@ namespace Hanga.Rendering
 
         private static string Method(IRequest request) => request.Method.ToString().ToUpperInvariant();
 
-        /// <summary>警告に載せる URL からクエリ文字列を除く(秘密の値が含まれうるため。要件8.5)。</summary>
+        /// <summary>例外・警告・ログに載せる URL からクエリ文字列を除く(秘密の値が含まれうるため。要件8.5)。</summary>
         private static string StripQuery(string url)
         {
             int q = url.IndexOfAny(new[] { '?', '#' });

@@ -11,4 +11,9 @@
     <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hanga\Hanga.csproj" />
+    <ProjectReference Include="..\Hanga.TestSupport\Hanga.TestSupport.csproj" />
+  </ItemGroup>
+
 </Project>
