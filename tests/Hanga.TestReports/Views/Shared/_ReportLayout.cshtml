@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/_content/Hanga.TestReports/css/report.css" asp-append-version="true" />
+    @RenderSection("Head", required: false)
+</head>
+<body>
+    @RenderBody()
+    <p id="js-check">JS未実行</p>
+    <script src="~/_content/Hanga.TestReports/js/report.js" asp-append-version="true"></script>
+</body>
+</html>

@@ -21,6 +21,17 @@ public async Task<IActionResult> OrderPdf(int id)
 }
 ```
 
+Web アプリとは別の実行ファイル(バッチ)の中で、帳票を一括で PDF にすることもできる。アプリケーションサーバーにはアクセスせず、
+ビューを描画する仕組みと Chromium をバッチの中に用意する(帳票のビューは Razor クラスライブラリにまとめて Web アプリと共有する)。
+
+```csharp
+await using var batch = await HangaBatch.StartAsync(options);    // options: Web アプリと同じ HangaOptions
+foreach (var customer in customers)
+{
+    await new Cshtml2Pdf(batch, "Invoice", "Invoice", BuildModel(customer)).SaveAsync($@"D:\out\{customer.Id}.pdf");
+}
+```
+
 詳しくは [`docs/ライブラリの使い方.md`](docs/ライブラリの使い方.md) を参照。
 
 ### 主な特長
@@ -49,8 +60,8 @@ dotnet test      # Chromium を使うテストがある。環境変数 HANGA_TES
 dotnet format
 ```
 
-- `src/` — `Hanga.Core`(例外・設定) / `Hanga.Templating`(ビューの HTML 化) / `Hanga.Rendering`(Chromium による PDF 化) / `Hanga`(公開 API と ASP.NET Core との接続)
-- `tests/` — ユニットテストと、テスト用アプリ(`Hanga.TestApp`)を使った結合テスト
+- `src/` — `Hanga.Core`(例外・設定) / `Hanga.Templating`(ビューの HTML 化) / `Hanga.Rendering`(Chromium による PDF 化) / `Hanga`(公開 API と ASP.NET Core との接続、バッチ用のホスト)
+- `tests/` — ユニットテストと、テスト用アプリ(`Hanga.TestApp`)・テスト用の帳票ライブラリ(`Hanga.TestReports`。バッチ用)を使った結合テスト
 - `samples/Hanga.Sample` — サンプルアプリ(使い方の例と、検証ツールの対象)
 - `tools/Hanga.ChromiumCheck` — Chromium 更新前の検証ツール、`tools/probe-fonts` — 字形の確認に使うフォントの生成
 - `docs/` — 利用の手引き・検証手順・PDF 出力方式の検証レポート・開発環境メモ

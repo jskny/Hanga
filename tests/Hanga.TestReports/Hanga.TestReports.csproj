@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    テスト用の帳票ライブラリ(Razor クラスライブラリ)。バッチ(Web アプリとは別の実行ファイル)が参照する形を模す
+    (batch-pdf-generation の design.md「帳票ライブラリとバッチの作り方」)。
+    帳票用のレイアウト・_ViewStart・部分ビュー・@inject・~/_content/... の CSS と JavaScript を持つ。
+  -->
+  <PropertyGroup>
+    <RootNamespace>Hanga.TestReports</RootNamespace>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

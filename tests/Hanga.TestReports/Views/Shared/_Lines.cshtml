@@ -1,0 +1,7 @@
+@model IEnumerable<InvoiceLine>
+<table>
+    @foreach (var line in Model)
+    {
+        <tr><td>@line.Name</td><td>@line.Amount.ToString("N0")</td></tr>
+    }
+</table>

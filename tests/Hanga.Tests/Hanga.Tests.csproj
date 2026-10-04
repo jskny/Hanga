@@ -13,6 +13,15 @@
     <ProjectReference Include="..\..\src\Hanga\Hanga.csproj" />
     <ProjectReference Include="..\Hanga.TestApp\Hanga.TestApp.csproj" />
     <ProjectReference Include="..\Hanga.TestSupport\Hanga.TestSupport.csproj" />
+    <ProjectReference Include="..\Hanga.TestReports\Hanga.TestReports.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      バッチのテストで使う、テスト用の帳票ライブラリの静的ファイル。テストは RollForward で .NET 10 のランタイムで動き、
+      .NET 5 形式の静的Webアセットの一覧を読まないため、フォルダを明示して与える(batch-pdf-generation の design.md「テスト戦略」)。
+    -->
+    <None Include="..\Hanga.TestReports\wwwroot\**" LinkBase="TestReportsWwwroot" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

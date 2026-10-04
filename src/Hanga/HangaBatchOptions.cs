@@ -1,0 +1,84 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Hanga
+{
+    /// <summary>
+    /// バッチ固有の設定(batch-pdf-generation の design.md「バッチ固有の設定」)。
+    /// Chromium の場所などアプリ全体の設定は、Web アプリと同じ <see cref="HangaOptions"/> で指定する。
+    /// </summary>
+    public sealed class HangaBatchOptions
+    {
+        /// <summary>
+        /// ビューを持つアセンブリ(帳票ライブラリ。要件2.2)。関連するビューのアセンブリ(<c>&lt;名前&gt;.Views.dll</c>)も含める。
+        /// 空なら ASP.NET Core MVC の既定の規則(バッチの実行ファイルが参照するライブラリ)でビューを探す。
+        /// </summary>
+        public List<Assembly> ViewAssemblies { get; } = new List<Assembly>();
+
+        /// <summary>コンテンツのルート。既定はバッチの実行ファイルのフォルダ(<see cref="AppContext.BaseDirectory"/>)。</summary>
+        public string? ContentRootPath { get; set; }
+
+        /// <summary>
+        /// 静的ファイルを置くフォルダ(Web ルート。要件3.3)。相対パスはコンテンツのルートからの相対。既定は <c>wwwroot</c>。
+        /// 発行したバッチでは、帳票ライブラリの静的ファイルが <c>wwwroot/_content/&lt;ライブラリ名&gt;/</c> に置かれる。
+        /// </summary>
+        public string? WebRootPath { get; set; }
+
+        /// <summary>
+        /// URL のパス(<c>/</c> で始まる。例: <c>/_content/Reports</c>)と、そのパスで応答する静的ファイルのフォルダの対応の追加(要件3.3)。
+        /// 相対パスのフォルダはコンテンツのルートからの相対。
+        /// </summary>
+        public Dictionary<string, string> StaticFileMappings { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>バッチ用の変換器の依存性注入への追加の登録(ビューが <c>@inject</c> で使うサービス、ログの出力先など。要件2.5)。</summary>
+        public Action<IServiceCollection>? ConfigureServices { get; set; }
+
+        /// <summary>コンテンツのルート(絶対パス)。</summary>
+        internal string ResolvedContentRootPath => Path.GetFullPath(string.IsNullOrWhiteSpace(ContentRootPath) ? AppContext.BaseDirectory : ContentRootPath!);
+
+        /// <summary>コンテンツのルートを基準に、フォルダの絶対パスを求める。</summary>
+        internal string ResolvePath(string path) => Path.GetFullPath(Path.Combine(ResolvedContentRootPath, path));
+
+        /// <summary>値を検証する。誤りがあれば、すべての誤りを含めて <see cref="HangaConfigurationException"/> を投げる。</summary>
+        internal void Validate()
+        {
+            var errors = new List<string>();
+            if (!Directory.Exists(ResolvedContentRootPath))
+            {
+                errors.Add($"ContentRootPath のフォルダが見つかりません: {ResolvedContentRootPath}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(WebRootPath) && !Directory.Exists(ResolvePath(WebRootPath!)))
+            {
+                errors.Add($"WebRootPath のフォルダが見つかりません: {ResolvePath(WebRootPath!)}");
+            }
+
+            foreach (var mapping in StaticFileMappings)
+            {
+                if (string.IsNullOrWhiteSpace(mapping.Key) || !mapping.Key.StartsWith("/", StringComparison.Ordinal))
+                {
+                    errors.Add($"StaticFileMappings の URL のパスは / で始めてください(指定: {mapping.Key})。");
+                }
+
+                if (string.IsNullOrWhiteSpace(mapping.Value) || !Directory.Exists(ResolvePath(mapping.Value)))
+                {
+                    errors.Add($"StaticFileMappings のフォルダが見つかりません({mapping.Key}): {mapping.Value}");
+                }
+            }
+
+            if (ViewAssemblies.Any(a => a == null))
+            {
+                errors.Add("ViewAssemblies に null が含まれています。");
+            }
+
+            if (errors.Count > 0)
+            {
+                throw new HangaConfigurationException("Hanga のバッチの設定に誤りがあります: " + string.Join(" ", errors));
+            }
+        }
+    }
+}
