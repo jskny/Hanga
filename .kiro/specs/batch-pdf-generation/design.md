@@ -114,7 +114,7 @@ foreach (var customer in customers)
 | `StaticFileMappings` | 空 | URLのパス(`/` で始まる)→ フォルダ の対応の追加(要件3.3)。Webアプリの発行先の `wwwroot` を直接使う場合などに使う |
 | `ConfigureServices` | null | ホストの依存性注入への追加の登録(ビューが `@inject` で使うサービス、ログの出力先、`WebEncoderOptions` など。要件2.5) |
 
-`StartAsync` の時点で検証し、誤り(`ContentRootPath`・`WebRootPath`・`StaticFileMappings` のフォルダが無い、URLのパスが `/` で始まらない、`ViewAssemblies` に null がある)は、すべての誤りを含めて `HangaConfigurationException` にする。
+`StartAsync` の時点で検証し、誤り(`ViewAssemblies` に関連するビューのアセンブリ(`<名前>.Views.dll`)が配置されていない、`ContentRootPath`・`WebRootPath`・`StaticFileMappings` のフォルダが無い、URLのパスが `/` で始まらない、`ViewAssemblies` に null がある)は、すべての誤りを含めて `HangaConfigurationException` にする。
 `HangaOptions` の検証(`Validate`)も同じ時点で行う。
 
 ## 各部の設計
@@ -129,36 +129,53 @@ foreach (var customer in customers)
 3. `UseServer(new NoopServer())`: ポートを開かない(要件1.1)。ホストの起動でルーティングなどの初期化だけが行われる。
 4. サービス: `AddControllersWithViews()`、`ViewAssemblies` の各アセンブリと関連するビューのアセンブリをアプリケーションパーツに加える
    (同じ種類・同じ名前の部品が既にあれば加えない)、`AddHanga(options)` と同じ部品の登録(パイプラインを捕まえる `IStartupFilter` を含む)、`ConfigureServices`。
-5. パイプライン: `UseStaticFiles()`(Webルート)→ `StaticFileMappings` ごとに `UseStaticFiles`(`RequestPath` とフォルダ)→ `UseRouting()` → `UseEndpoints(MapControllers)`。
+5. パイプライン: `UseStaticFiles()`(Webルート)→ `StaticFileMappings` ごとに `UseStaticFiles`(`RequestPath` とフォルダ)→ `UseRouting()` → 404 を返す終端 →
+   `UseEndpoints(MapControllers + MapDefaultControllerRoute)`(URLの生成のための登録だけ。終端より後ろのため実行されない)。
    捕まえたパイプラインの先頭は Hanga の `IStartupFilter` が加える(中核機能と同じ)。
 6. ホストを起動し(`StartAsync`)、続けて Chromium を起動する(`WarmUpAsync`。要件1.3)。失敗した場合はホストを停止・破棄してから例外を投げる。
 
-- ルーティング(`UseRouting`・`UseEndpoints`)は、タグヘルパーの URL の生成(`asp-controller`/`asp-action`)に必要(検証レポート「6.4」)。
-  バッチにコントローラーが無い場合、生成される URL は空になると考えられる(未確認。帳票では通常使わない)。
-- 環境名は既定(`Production`)のまま。レイアウトの `<environment>` タグヘルパーは本番と同じ側が選ばれる。
-- ホストの設定ファイル(`appsettings.json`)・環境変数は読まない(Hanga の設定は `HangaOptions` で受け取る)。ログの出力先は `ConfigureServices` で登録する。
+- ルーティング(`UseRouting`・`UseEndpoints`)は、タグヘルパーの URL の生成(`asp-controller`/`asp-action`、`Url.Action`)のためだけに使う(検証レポート「6.4」)。
+  属性で経路を指定したコントローラーと、既定の経路(`{controller=Home}/{action=Index}/{id?}`)のコントローラーの URL を生成できる(テストで確認)。
+  Webアプリの `Startup` で独自に定義した経路は再現しない。バッチにコントローラーが無い場合、生成される URL は空になると考えられる(未確認。帳票では通常使わない)。
+- **コントローラーのアクションは実行させない**: バッチのパイプラインには認証・認可が無く、Webアプリのグローバルな認可フィルターも入らない。
+  帳票のページ(モデルの値を `Html.Raw` で出す場合など)から、Webアプリや帳票ライブラリのアクションが認証なしで実行されないよう、
+  ルーティングの後ろに 404 を返す終端を置く(セキュリティレビューの指摘。テストで確認)。
+- **コンテンツのルートを公開しない**: `WebRootPath`・`StaticFileMappings` に、コンテンツのルートそのもの、またはその上位のフォルダを指定すると、
+  バッチの設定ファイル(`appsettings.json`)やプログラムが帳票のページから読めてしまうため、`StartAsync` で `HangaConfigurationException` にする(セキュリティレビューの指摘)。
+- 環境名は `Production` に固定する。レイアウトの `<environment>` タグヘルパーは本番と同じ側が選ばれる。
+- ホストの設定ファイル(`appsettings.json`)は読まない(Hanga の設定は `HangaOptions` で受け取る)。ログの出力先は `ConfigureServices` で登録する。
+  Web のホストは `ASPNETCORE_` で始まる環境変数を読むため、コンテンツのルート・Webルート・環境名を明示して上書きし、
+  外部のアセンブリによる起動時の処理(Hosting Startup)を読み込ませない(コードレビューの指摘)。
+- 汎用ホストの既定の寿命の管理(`ConsoleLifetime`)は使わず、何もしないもの(`BatchHostLifetime`)に替える。
+  `ConsoleLifetime` は Ctrl+C を握りつぶし、プロセスの終了時(`Environment.Exit` を含む)にホストの破棄を待って止まるため、バッチの終了を妨げる(コードレビューの指摘)。
+- 呼び出し元から受け取った `HangaOptions` は、写さずにそのまま使う(`AddHanga` と違い、呼び出し元が作ったものを受け取るため)。起動後に値を変えないことを API の説明に書く。
 
 ### 帳票1件用の `HttpContext`(要件2.4, 3.4)
 
 `Cshtml2Pdf` のバッチ用のコンストラクターは、`HangaBatch` と引数を保持するだけにする。`GenerateAsync` の中で次を行い、終わったらスコープを破棄する。
 
-1. ホストのサービスから依存性注入のスコープを作る。
+1. ホストのサービスから依存性注入のスコープを作る。生成が終わったら非同期で破棄する
+   (`IAsyncDisposable` だけを実装したサービスを同期で破棄すると例外になるため。Webアプリの要求のスコープと同じ扱い。コードレビューの指摘)。
 2. `DefaultHttpContext` を作り、`RequestServices` にスコープを設定する。スキームとホストは仮想オリジン(`HangaOptions.VirtualOrigin`)の値にする。
    ビューが絶対URLを生成した場合も、仮想オリジン(= 帳票のページのオリジン)を指すため、Chromium からの要求はパイプラインに渡る。
 3. ダミーのエンドポイントを設定する(`SetEndpoint`)。タグヘルパーの URL の生成がエンドポイントルーティングの仕組みを使うようにするため(検証レポート「6.4」)。
 4. `RequestSnapshot.From(httpContext)` で写し取る。Cookie・`Accept-Language` は空になり、パイプラインへの転送で付かない(要件3.4)。
 5. 中核機能の `HangaPdfConverter.GenerateAsync` を呼ぶ(ビューのHTML化・ページの表示・PDF化)。
 
-`HttpContext.User` は認証されていない空のユーザー、`Session` は使えない(使うと `HangaViewRenderingException`)。ビューが使う値はモデルから渡す(要件「対象外」)。
+`HttpContext.User` は認証されていない空のユーザー、`Session` は使えない(使うと `HangaViewRenderingException`)。
+`IHttpContextAccessor.HttpContext` は設定しない(null)。ビューが使う値はモデルから渡す(要件「対象外」)。
 取り消しは、呼び出し元が渡した `CancellationToken` だけを使う(元の要求の取り消しが無いため)。
 
 ### ファイルへの保存(`Cshtml2Pdf.SaveAsync`。要件4.2)
 
 1. PDF を生成する(失敗した場合は何も作らない。既存の動作)。
-2. 保存先と同じフォルダに、一時ファイル(`<保存先のファイル名>.<ランダムな文字列>.tmp`)を作って書き込む。
+2. 保存先と同じフォルダに、一時ファイル(`<保存先のファイル名>.<ランダムな8文字>.tmp`)を新規に作って(`FileMode.CreateNew`。同じ名前のファイル・リンクがあれば上書きせず失敗)書き込む。
 3. `File.Move(一時ファイル, 保存先, overwrite: true)` で保存先の名前に変える。同じフォルダ内の名前の変更のため、途中までのPDFが保存先に見えることは無い。
 4. 2・3 で例外(取り消しを含む)が起きた場合は、一時ファイルを削除してから例外を投げ直す。既にある保存先のファイルは変わらない。
    書き込み・名前の変更の失敗は `IOException` などのまま投げる(Hangaの例外に包まない。要件4.3)。
+
+バッチのプロセスが強制終了された場合は、一時ファイル(帳票の内容を含む)が保存先のフォルダに残ることがある。
+既存のファイルを置き換えた場合、そのファイルに個別に付けたアクセス権は引き継がれず、フォルダから継承したものになる。どちらも利用の手引きに書く。
 
 Webアプリで使う場合の `SaveAsync` も同じ処理になる(中核機能の要件7.1 の改善。Webアプリの動作に影響は無い)。
 

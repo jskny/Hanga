@@ -59,6 +59,77 @@ namespace Hanga.Tests
         }
 
         [Fact]
+        public async Task 帳票ごとにスコープを作り非同期で破棄する()
+        {
+            // 要件2.4, 2.5: IAsyncDisposable だけを実装したスコープのサービスも、帳票ごとに作られて破棄される
+            var created = new System.Collections.Concurrent.ConcurrentBag<AsyncOnlyScope>();
+            await using var batch = await HangaBatch.StartAsync(HangaBatchFixture.NewOptions(), b =>
+            {
+                HangaBatchFixture.ConfigureTestReports(b);
+                b.ConfigureServices += services => services.AddScoped<IReportScope>(_ =>
+                {
+                    var scope = new AsyncOnlyScope(created.Count + 1);
+                    created.Add(scope);
+                    return scope;
+                });
+            });
+
+            string first = PdfInspector.Read(await new Cshtml2Pdf(batch, "Invoice", "Scoped").ToBytesAsync()).AllText;
+            string second = PdfInspector.Read(await new Cshtml2Pdf(batch, "Invoice", "Scoped").ToBytesAsync()).AllText;
+
+            Assert.Contains("スコープ: 1", first);
+            Assert.Contains("スコープ: 2", second);
+            Assert.Equal(2, created.Count);
+            Assert.All(created, s => Assert.True(s.Disposed));
+        }
+
+        [Fact]
+        public async Task バッチのCtrlCとプロセスの終了を横取りしない()
+        {
+            // 汎用ホストの既定(ConsoleLifetime)を使わない(コードレビューの指摘)
+            await using var batch = await HangaBatch.StartAsync(HangaBatchFixture.NewOptions(), HangaBatchFixture.ConfigureTestReports);
+            var lifetime = batch.Services.GetRequiredService<Microsoft.Extensions.Hosting.IHostLifetime>();
+            Assert.Equal("BatchHostLifetime", lifetime.GetType().Name);
+        }
+
+        [Fact]
+        public async Task コントローラーはURLの生成にだけ使いアクションは実行させない()
+        {
+            // バッチには認証・認可が無いため、帳票のページからの要求でアクションを実行させない(セキュリティレビューの指摘)
+            await using var batch = await HangaBatch.StartAsync(HangaBatchFixture.NewOptions(), HangaBatchFixture.ConfigureTestReports);
+
+            string text = PdfInspector.Read(await new Cshtml2Pdf(batch, "Invoice", "Links").ToBytesAsync()).AllText;
+            Assert.Contains("リンク: /Probe/Run", text);
+
+            var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+            context.Request.Method = "GET";
+            context.Request.Path = "/Probe/Run";
+            using (var scope = batch.Services.CreateScope())
+            {
+                context.RequestServices = scope.ServiceProvider;
+                await batch.Services.GetRequiredService<Hanga.Hosting.PipelineHolder>().GetRequired()(context);
+            }
+
+            Assert.Equal(404, context.Response.StatusCode);
+            Assert.Equal(0, ProbeController.RunCount);
+        }
+
+        [Fact]
+        public async Task コンテンツのルートを静的ファイルとして公開する指定を拒む()
+        {
+            // 設定ファイル・プログラムを帳票のページから読めないようにする(セキュリティレビューの指摘)
+            using var dir = new BatchTests.TemporaryDirectory();
+            var ex = await Assert.ThrowsAsync<HangaConfigurationException>(() => HangaBatch.StartAsync(HangaBatchFixture.NewOptions(), b =>
+            {
+                b.ContentRootPath = dir.Path;
+                b.WebRootPath = ".";
+                b.StaticFileMappings["/files"] = Path.GetDirectoryName(dir.Path)!;
+            }));
+            Assert.Contains("WebRootPath に、コンテンツのルート", ex.Message);
+            Assert.Contains("StaticFileMappings に、コンテンツのルート", ex.Message);
+        }
+
+        [Fact]
         public async Task 静的ファイルのフォルダが無ければ起動時に知らせる()
         {
             // 要件1.3, 3.3: Chromium を起動する前に、すべての誤りを知らせる
@@ -118,6 +189,24 @@ namespace Hanga.Tests
             output.WriteLine($"1件ずつ {count} 件: {sequential.ElapsedMilliseconds} ms(1件あたり {sequential.ElapsedMilliseconds / count} ms)");
             output.WriteLine($"並行 {count} 件(同時処理数 {HangaBatchFixture.NewOptions().MaxConcurrentRenders}): {parallel.ElapsedMilliseconds} ms(1件あたり {parallel.ElapsedMilliseconds / count} ms)");
             Assert.InRange(sequential.ElapsedMilliseconds / count, 0, 30_000);
+        }
+
+        private sealed class AsyncOnlyScope : IReportScope, IAsyncDisposable
+        {
+            public AsyncOnlyScope(int id)
+            {
+                Id = id;
+            }
+
+            public int Id { get; }
+
+            public bool Disposed { get; private set; }
+
+            public ValueTask DisposeAsync()
+            {
+                Disposed = true;
+                return default;
+            }
         }
 
         private static void CopyDirectory(string source, string destination)

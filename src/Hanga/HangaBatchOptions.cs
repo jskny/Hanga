@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Hanga
@@ -43,6 +44,15 @@ namespace Hanga
         /// <summary>コンテンツのルートを基準に、フォルダの絶対パスを求める。</summary>
         internal string ResolvePath(string path) => Path.GetFullPath(Path.Combine(ResolvedContentRootPath, path));
 
+        /// <summary>フォルダが、コンテンツのルートそのもの、またはその上位か(バッチの設定ファイル・プログラムを静的ファイルとして公開してしまう指定を拒む)。</summary>
+        private bool ExposesContentRoot(string folder)
+        {
+            string root = Path.TrimEndingDirectorySeparator(ResolvedContentRootPath) + Path.DirectorySeparatorChar;
+            string candidate = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
+            StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            return root.StartsWith(candidate, comparison);
+        }
+
         /// <summary>値を検証する。誤りがあれば、すべての誤りを含めて <see cref="HangaConfigurationException"/> を投げる。</summary>
         internal void Validate()
         {
@@ -57,6 +67,11 @@ namespace Hanga
                 errors.Add($"WebRootPath のフォルダが見つかりません: {ResolvePath(WebRootPath!)}");
             }
 
+            if (!string.IsNullOrWhiteSpace(WebRootPath) && ExposesContentRoot(ResolvePath(WebRootPath!)))
+            {
+                errors.Add($"WebRootPath に、コンテンツのルート(またはその上位)のフォルダは指定できません(設定ファイルやプログラムが帳票のページから読めてしまうため): {ResolvePath(WebRootPath!)}");
+            }
+
             foreach (var mapping in StaticFileMappings)
             {
                 if (string.IsNullOrWhiteSpace(mapping.Key) || !mapping.Key.StartsWith("/", StringComparison.Ordinal))
@@ -68,11 +83,28 @@ namespace Hanga
                 {
                     errors.Add($"StaticFileMappings のフォルダが見つかりません({mapping.Key}): {mapping.Value}");
                 }
+                else if (ExposesContentRoot(ResolvePath(mapping.Value)))
+                {
+                    errors.Add($"StaticFileMappings に、コンテンツのルート(またはその上位)のフォルダは指定できません(設定ファイルやプログラムが帳票のページから読めてしまうため)({mapping.Key}): {mapping.Value}");
+                }
             }
 
             if (ViewAssemblies.Any(a => a == null))
             {
                 errors.Add("ViewAssemblies に null が含まれています。");
+            }
+
+            foreach (Assembly assembly in ViewAssemblies.Where(a => a != null))
+            {
+                try
+                {
+                    // 関連するビューのアセンブリ(<名前>.Views.dll)が配置されていない場合を、起動時に知らせる
+                    RelatedAssemblyAttribute.GetRelatedAssemblies(assembly, throwOnError: true);
+                }
+                catch (Exception ex) when (ex is FileNotFoundException || ex is FileLoadException || ex is BadImageFormatException)
+                {
+                    errors.Add($"ViewAssemblies の {assembly.GetName().Name} に関連するビューのアセンブリを読み込めません: {ex.Message}");
+                }
             }
 
             if (errors.Count > 0)

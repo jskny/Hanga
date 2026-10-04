@@ -26,6 +26,12 @@ namespace Hanga.TestReports
         public decimal Amount { get; }
     }
 
+    /// <summary>帳票 1 件ごとのスコープのサービス。帳票ごとにスコープが分かれ、破棄されることを確かめる(batch-pdf-generation の要件2.4)。</summary>
+    public interface IReportScope
+    {
+        int Id { get; }
+    }
+
     /// <summary>ビューが <c>@inject</c> で使うサービス。バッチ側で登録する(batch-pdf-generation の要件2.5)。</summary>
     public interface ICompanyInfo
     {

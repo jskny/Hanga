@@ -28,10 +28,12 @@ namespace Hanga.Hosting
                 .UseContentRoot(contentRoot)
                 .ConfigureWebHost(web =>
                 {
-                    if (!string.IsNullOrWhiteSpace(batchOptions.WebRootPath))
-                    {
-                        web.UseWebRoot(batchOptions.ResolvePath(batchOptions.WebRootPath!));
-                    }
+                    // Web のホストは ASPNETCORE_ で始まる環境変数を読む。バッチの動作が環境変数で変わらないよう、
+                    // コンテンツのルート・Web ルート・環境名を固定し、外部のアセンブリによる起動時の処理(Hosting Startup)を読み込ませない
+                    web.UseContentRoot(contentRoot);
+                    web.UseWebRoot(batchOptions.ResolvePath(string.IsNullOrWhiteSpace(batchOptions.WebRootPath) ? "wwwroot" : batchOptions.WebRootPath!));
+                    web.UseEnvironment(Environments.Production);
+                    web.UseSetting(WebHostDefaults.PreventHostingStartupKey, "true");
 
                     // 開発中の実行(ビルドの出力)では、帳票ライブラリの wwwroot を /_content/<ライブラリ名>/ に重ねる。
                     // 発行したバッチには一覧(<バッチ名>.StaticWebAssets.xml)が無く、何もしない(発行先の wwwroot/_content/ から応答する)
@@ -41,6 +43,8 @@ namespace Hanga.Hosting
                     web.UseServer(new NoopServer());
                     web.ConfigureServices(services =>
                     {
+                        // 汎用ホストの既定(ConsoleLifetime)は Ctrl+C とプロセスの終了を横取りし、バッチの終了を妨げるため、何もしないものに替える
+                        services.AddSingleton<IHostLifetime, BatchHostLifetime>();
                         IMvcBuilder mvc = services.AddControllersWithViews();
                         if (batchOptions.ViewAssemblies.Count > 0)
                         {
@@ -63,9 +67,20 @@ namespace Hanga.Hosting
                             });
                         }
 
-                        // タグヘルパーの URL の生成(asp-controller/asp-action)に必要(検証レポート「6.4」)
+                        // ルーティングは、タグヘルパーの URL の生成(asp-controller/asp-action)のためだけに使う(検証レポート「6.4」)。
+                        // バッチには認証・認可が無いため、コントローラーのアクションは実行させない(帳票のページからの要求は 404 にする。セキュリティレビューの指摘)
                         app.UseRouting();
-                        app.UseEndpoints(endpoints => endpoints.MapControllers());
+                        app.Run(context =>
+                        {
+                            context.Response.StatusCode = StatusCodes.Status404NotFound;
+                            return Task.CompletedTask;
+                        });
+                        app.UseEndpoints(endpoints =>
+                        {
+                            // 属性で経路を指定したコントローラーと、既定の経路({controller=Home}/{action=Index}/{id?})のコントローラーの URL を生成できるようにする
+                            endpoints.MapControllers();
+                            endpoints.MapDefaultControllerRoute();
+                        });
                     });
                 })
                 .Build();
@@ -79,7 +94,7 @@ namespace Hanga.Hosting
         {
             foreach (Assembly assembly in assemblies.Distinct())
             {
-                foreach (Assembly target in new[] { assembly }.Concat(RelatedAssemblyAttribute.GetRelatedAssemblies(assembly, throwOnError: true)))
+                foreach (Assembly target in new[] { assembly }.Concat(RelatedAssemblyAttribute.GetRelatedAssemblies(assembly, throwOnError: false)))
                 {
                     foreach (ApplicationPart part in ApplicationPartFactory.GetApplicationPartFactory(target).GetApplicationParts(target))
                     {
@@ -91,6 +106,17 @@ namespace Hanga.Hosting
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// バッチのホストの寿命の管理(何もしない)。既定の <c>ConsoleLifetime</c> は Ctrl+C を握りつぶし、プロセスの終了時にホストの破棄を待つため、
+    /// バッチの Ctrl+C・<c>Environment.Exit</c> を妨げる。ホストの停止は <see cref="HangaBatch"/> の終了で行う。
+    /// </summary>
+    internal sealed class BatchHostLifetime : IHostLifetime
+    {
+        public Task WaitForStartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     /// <summary>ポートを開かない <see cref="IServer"/>(検証レポート「6.4」)。要求は受け付けず、Hanga がパイプラインを直接呼ぶ。</summary>

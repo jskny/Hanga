@@ -135,6 +135,11 @@ namespace Hanga
         /// <param name="cancellationToken">取り消し。</param>
         public async Task SaveAsync(string path, CancellationToken cancellationToken = default)
         {
+            if (path == null)
+            {
+                throw new ArgumentNullException(nameof(path));
+            }
+
             if (string.IsNullOrWhiteSpace(path))
             {
                 throw new ArgumentException("保存先のファイルを指定してください。", nameof(path));
@@ -142,10 +147,16 @@ namespace Hanga
 
             byte[] pdf = await ToBytesAsync(cancellationToken).ConfigureAwait(false);
             string fullPath = Path.GetFullPath(path);
-            string temporary = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            // 一時ファイルの名前は短くする(深いフォルダで Windows のパスの長さの上限を超えにくくするため)
+            string temporary = fullPath + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp";
             try
             {
-                await File.WriteAllBytesAsync(temporary, pdf, Effective(cancellationToken)).ConfigureAwait(false);
+                // 同じ名前のファイル・リンクがあれば上書きせずに失敗させる(他の利用者も書き込めるフォルダに保存する場合に備える)
+                using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+                {
+                    await stream.WriteAsync(pdf, 0, pdf.Length, Effective(cancellationToken)).ConfigureAwait(false);
+                }
+
                 File.Move(temporary, fullPath, overwrite: true);
             }
             catch
@@ -188,7 +199,7 @@ namespace Hanga
         /// <summary>バッチでは、帳票 1 件ごとにスコープと HttpContext を作り、生成が終わったら破棄する(batch-pdf-generation の design.md「帳票1件用の HttpContext」)。</summary>
         private async Task<HangaPdfDocument> GenerateInBatchAsync(HangaBatch owner, CancellationToken cancellationToken)
         {
-            using BatchRequest request = owner.CreateRequest();
+            await using BatchRequest request = owner.CreateRequest();
             var view = new ViewRenderRequest(request.HttpContext, controllerName, viewName, model);
             return await converter.GenerateAsync(view, RequestSnapshot.From(request.HttpContext), Options, cancellationToken).ConfigureAwait(false);
         }

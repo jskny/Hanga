@@ -5,6 +5,7 @@ using Hanga.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Hanga
 {
@@ -17,6 +18,7 @@ namespace Hanga
     /// await pdf.SaveAsync(path);
     /// </code>
     /// スレッドセーフで、バッチ全体で 1 つを共有する(要件1.5)。帳票 1 件ごとの入口は <see cref="Cshtml2Pdf"/>。
+    /// 渡した <see cref="HangaOptions"/> は起動後もそのまま使う。起動後に値を変えないこと(変えた値は検証されない)。
     /// </summary>
     public sealed class HangaBatch : IAsyncDisposable, IDisposable
     {
@@ -61,6 +63,7 @@ namespace Hanga
             batchOptions.Validate();
 
             IHost host = BatchHostBuilder.Build(options, batchOptions);
+            ILogger logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger<HangaBatch>();
             try
             {
                 await host.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -70,8 +73,16 @@ namespace Hanga
             }
             catch
             {
-                // 起動に失敗したら、起動しかけた Chromium も含めて後始末してから例外を返す
-                await StopAndDisposeAsync(host).ConfigureAwait(false);
+                // 起動に失敗したら、起動しかけた Chromium も含めて後始末してから、元の例外を返す(後始末の失敗で原因を隠さない。要件1.3)
+                try
+                {
+                    await StopAndDisposeAsync(host).ConfigureAwait(false);
+                }
+                catch (Exception cleanup)
+                {
+                    logger.LogWarning(cleanup, "起動に失敗した後の後始末で例外が発生しました。");
+                }
+
                 throw;
             }
         }
@@ -136,8 +147,11 @@ namespace Hanga
         }
     }
 
-    /// <summary>帳票 1 件用のスコープと <see cref="HttpContext"/>。生成が終わったら破棄する。</summary>
-    internal sealed class BatchRequest : IDisposable
+    /// <summary>
+    /// 帳票 1 件用のスコープと <see cref="HttpContext"/>。生成が終わったら非同期で破棄する
+    /// (<see cref="IAsyncDisposable"/> だけを実装したサービスを同期で破棄すると例外になるため。Web アプリの要求のスコープと同じ扱い)。
+    /// </summary>
+    internal sealed class BatchRequest : IAsyncDisposable
     {
         private readonly IServiceScope scope;
 
@@ -149,6 +163,15 @@ namespace Hanga
 
         public HttpContext HttpContext { get; }
 
-        public void Dispose() => scope.Dispose();
+        public ValueTask DisposeAsync()
+        {
+            if (scope is IAsyncDisposable asyncDisposable)
+            {
+                return asyncDisposable.DisposeAsync();
+            }
+
+            scope.Dispose();
+            return default;
+        }
     }
 }
