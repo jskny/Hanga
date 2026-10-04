@@ -29,8 +29,8 @@ namespace Hanga.EdgeCases
             catch (ArgumentException ex)
             {
                 Console.Error.WriteLine(ex.Message);
-                Console.Error.WriteLine("使い方: dotnet run --project samples/Hanga.EdgeCases -- --chromium <Chromium> [--arg <引数>]... [--gaiji-font <名前>] [--out <フォルダ>] [--only <ケースの番号の先頭>]");
-                return 2;
+                Console.Error.WriteLine("使い方(終了コード: 期待と違う結果の件数。引数の誤りは -1): dotnet run --project samples/Hanga.EdgeCases -- --chromium <Chromium> [--arg <引数>]... [--gaiji-font <名前>] [--out <フォルダ>] [--only <ケースの番号の先頭>]");
+                return -1;
             }
 
             Directory.CreateDirectory(settings.OutputDirectory);
@@ -60,7 +60,9 @@ namespace Hanga.EdgeCases
             Task finished = await Task.WhenAny(run, Task.Delay(HangLimit));
             if (finished != run)
             {
-                return new Result(scenario, false, $"応答なし({HangLimit.TotalSeconds:0}秒以上)", stopwatch.Elapsed.TotalSeconds);
+                // 打ち切ったケースの例外は観測済みにする(後のケースの結果には、同時処理数の枠を使い続けることで影響しうる。その旨を表に出す)
+                _ = run.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+                return new Result(scenario, false, $"応答なし({HangLimit.TotalSeconds:0}秒以上。以降のケースに影響しうる)", stopwatch.Elapsed.TotalSeconds);
             }
 
             Check check;

@@ -68,14 +68,20 @@ namespace Hanga.Rendering
         private readonly CancellationToken cancellationToken;
         private readonly ConcurrentQueue<FailedRequest> failedRequests = new ConcurrentQueue<FailedRequest>();
         private readonly ConcurrentQueue<HangaWarning> warnings = new ConcurrentQueue<HangaWarning>();
+
+        /// <summary>種類ごとの警告の数(上限を超えた分は記録せず、数だけ数える)。</summary>
+        private readonly ConcurrentDictionary<HangaWarningKind, int> warningCounts = new ConcurrentDictionary<HangaWarningKind, int>();
         private readonly ConcurrentDictionary<IRequest, string> pendingRequests = new ConcurrentDictionary<IRequest, string>();
 
         /// <summary>許可した外部ホストへ通した要求(失敗を記録するため)。</summary>
         private readonly ConcurrentDictionary<IRequest, bool> continuedExternalRequests = new ConcurrentDictionary<IRequest, bool>();
         private long totalResponseBytes;
 
-        /// <summary>ページ全体の移動の要求の数(1 回目は帳票の URL への移動。2 回目以降は止める。要件2.7)。</summary>
-        private int mainFrameNavigations;
+        /// <summary>帳票の URL への最初の移動を始めたか(それ以外のページ全体の移動は止める。要件2.7)。</summary>
+        private int reportNavigationStarted;
+
+        /// <summary>移動を止めたことがあるか(表示の完了の待ち方を切り替えるため)。</summary>
+        private readonly TaskCompletionSource<bool> navigationBlocked = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         private ReportPage(IPage page, ReportPageSetup setup, ILogger logger, CancellationToken cancellationToken)
         {
@@ -90,8 +96,26 @@ namespace Hanga.Rendering
         /// <summary>失敗した仮想オリジンへの要求(要件3.5)。</summary>
         public IReadOnlyList<FailedRequest> FailedRequests => failedRequests.ToList();
 
-        /// <summary>ページで見つかった問題(外部への要求の遮断・スクリプトの例外など)。</summary>
-        public IReadOnlyList<HangaWarning> Warnings => warnings.ToList();
+        /// <summary>種類ごとに記録する警告の上限(ダイアログを繰り返し出すページなどで、メモリとログを使い尽くさないため)。</summary>
+        internal const int MaxWarningsPerKind = 20;
+
+        /// <summary>警告の詳細の長さの上限(文字数)。</summary>
+        internal const int MaxWarningDetailLength = 200;
+
+        /// <summary>ページで見つかった問題(外部への要求の遮断・スクリプトの例外など)。上限を超えた種類は「ほか N 件」の警告を加える。</summary>
+        public IReadOnlyList<HangaWarning> Warnings
+        {
+            get
+            {
+                var list = warnings.ToList();
+                foreach (var count in warningCounts.Where(c => c.Value > MaxWarningsPerKind).OrderBy(c => c.Key))
+                {
+                    list.Add(new HangaWarning(count.Key, $"同じ種類の警告が、ほかに {count.Value - MaxWarningsPerKind} 件ありました(記録を省略しました)。"));
+                }
+
+                return list;
+            }
+        }
 
         /// <summary>まだ完了していない要求の URL(タイムアウトの説明に使う。要件4.4)。</summary>
         public IReadOnlyList<string> PendingRequestUrls => pendingRequests.Values.ToList();
@@ -108,6 +132,7 @@ namespace Hanga.Rendering
             page.Response += (s, e) => reportPage.OnExternalResponse(e.Response);
             page.PageError += (s, e) => reportPage.AddWarning(new HangaWarning(HangaWarningKind.ScriptError, "ページの JavaScript で例外が発生しました。", e.Message));
             page.Dialog += reportPage.OnDialog;
+            page.Popup += reportPage.OnPopup;
             return reportPage;
         }
 
@@ -137,10 +162,70 @@ namespace Hanga.Rendering
                 throw;
             }
 
-            await navigation.ConfigureAwait(false);
+            // 移動を止めた(204 で応えた)後は、Chromium がネットワークの静止を通知しないことがある(負荷が高いときに起きた)。
+            // その場合は、ページの読み込みの完了と、Hanga が扱う要求が一定時間無いことを自分で確かめて、待機を終える
+            Task fallback = WaitForQuietAfterBlockedNavigationAsync();
+            if (await Task.WhenAny(navigation, fallback).ConfigureAwait(false) == navigation)
+            {
+                await navigation.ConfigureAwait(false);
+                return;
+            }
+
+            _ = navigation.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            await fallback.ConfigureAwait(false);
         }
 
-        internal void AddWarning(HangaWarning warning) => warnings.Enqueue(warning);
+        /// <summary>移動を止めた後に、ページの読み込みが完了し、要求が 500 ミリ秒の間無いことを待つ(ネットワークの静止と同じ基準)。</summary>
+        private async Task WaitForQuietAfterBlockedNavigationAsync()
+        {
+            await navigationBlocked.Task.ConfigureAwait(false);
+            var quiet = System.Diagnostics.Stopwatch.StartNew();
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                bool complete;
+                try
+                {
+                    complete = IsOnReportPage && await Page.EvaluateExpressionAsync<bool>("document.readyState === 'complete'").ConfigureAwait(false);
+                }
+                catch (PuppeteerException)
+                {
+                    complete = false;
+                }
+
+                if (!complete || pendingRequests.Count > 0)
+                {
+                    quiet.Restart();
+                }
+                else if (quiet.ElapsedMilliseconds >= 500)
+                {
+                    return;
+                }
+
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        internal void AddWarning(HangaWarning warning)
+        {
+            if (warningCounts.AddOrUpdate(warning.Kind, 1, (_, n) => n + 1) > MaxWarningsPerKind)
+            {
+                return;
+            }
+
+            string? detail = warning.Detail;
+            if (detail != null && detail.Length > MaxWarningDetailLength)
+            {
+                detail = detail.Substring(0, MaxWarningDetailLength) + "…";
+                warning = new HangaWarning(warning.Kind, warning.Message, detail);
+            }
+
+            warnings.Enqueue(warning);
+        }
+
+        /// <summary>今のページが帳票のページか(about:blank など、要求を出さない移動で離れていないか。要件2.7)。</summary>
+        public bool IsOnReportPage =>
+            string.Equals(StripQuery(Page.Url), setup.VirtualOrigin + ReportPath, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>JavaScript の文字列リテラルにする(ページの内容を式に埋め込まないため、URL など Hanga 自身の値だけに使う)。</summary>
         internal static string JsString(string value)
@@ -185,19 +270,49 @@ namespace Hanga.Rendering
         }
 
         /// <summary>
-        /// ダイアログ(alert・confirm・prompt・beforeunload)は、閉じないとページの JavaScript が止まり、時間切れになる。
-        /// オペレーターが「OK」を押した場合と同じく受け入れて続け、警告として記録する(要件4.6)。内容は氏名などを含みうるため詳細に入れる。
+        /// ダイアログは、閉じないとページの JavaScript が止まり、タイムアウトになる。閉じて続け、警告として記録する(要件4.6)。
+        /// alert は「OK」で閉じる。confirm・prompt・離脱の確認は「キャンセル」で閉じる。誰も答えていない確認を「OK」として扱うと、
+        /// 「削除しますか」などの確認の後の処理が、オペレーターの権限で実行されてしまうため(セキュリティレビューの指摘)。
+        /// 文言は氏名などを含みうるため詳細に入れる。
         /// </summary>
         private async void OnDialog(object? sender, DialogEventArgs e)
         {
-            AddWarning(new HangaWarning(HangaWarningKind.Dialog, $"ページの JavaScript がダイアログ({e.Dialog.DialogType})を出したため、「OK」で閉じて続けました。", e.Dialog.Message));
+            bool isAlert = e.Dialog.DialogType == DialogType.Alert;
+            AddWarning(new HangaWarning(
+                HangaWarningKind.Dialog,
+                $"ページの JavaScript がダイアログ({e.Dialog.DialogType})を出したため、「{(isAlert ? "OK" : "キャンセル")}」で閉じて続けました。",
+                e.Dialog.Message));
             try
             {
-                await e.Dialog.Accept(e.Dialog.DefaultValue).ConfigureAwait(false);
+                if (isAlert)
+                {
+                    await e.Dialog.Accept().ConfigureAwait(false);
+                }
+                else
+                {
+                    await e.Dialog.Dismiss().ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
                 logger.LogDebug(ex, "ダイアログを閉じられませんでした(ページが閉じられた可能性があります)。");
+            }
+        }
+
+        /// <summary>
+        /// 別のウィンドウ(window.open・target=_blank)は、要求への介入が効かないため、すぐに閉じて警告にする(要件2.7)。
+        /// 閉じる前に出た要求は、行き止まりのプロキシ(BrowserHost の起動引数)で外へ出ない。
+        /// </summary>
+        private async void OnPopup(object? sender, PopupEventArgs e)
+        {
+            AddWarning(new HangaWarning(HangaWarningKind.BlockedNavigation, "ページが別のウィンドウを開こうとしたため、閉じました。", StripQuery(e.PopupPage.Url)));
+            try
+            {
+                await e.PopupPage.CloseAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "別のウィンドウを閉じられませんでした。");
             }
         }
 
@@ -227,13 +342,17 @@ namespace Hanga.Rendering
 
         private async Task RouteAsync(IRequest request)
         {
-            if (request.IsNavigationRequest && request.Frame == Page.MainFrame && Interlocked.Increment(ref mainFrameNavigations) > 1)
+            if (request.IsNavigationRequest && ShouldBlockNavigation(request))
             {
-                // 帳票を開いた後のページ全体の移動(location.href の変更・フォームの送信・再読み込み)は止め、元のページを PDF にする。
-                // 止めないと、移動先の内容の PDF を黙って返してしまう(要件2.7)。
+                // 帳票を開いた後のページ全体の移動(location.href の変更・フォームの送信・再読み込み)と、内側のフレームのフォームの送信は止め、
+                // 元のページを PDF にする。止めないと、移動先の内容の PDF を黙って返したり、送信がアプリに届いたりする(要件2.7)。
                 // 要求を中断(abort)すると Chromium がエラーページへ移るため、ブラウザが元のページに留まる 204(No Content)で応える
                 AddWarning(new HangaWarning(HangaWarningKind.BlockedNavigation, "帳票を開いた後に、ページが別の URL へ移動しようとしたため、止めました。", StripQuery(request.Url)));
                 await RespondAsync(request, 204, null, Array.Empty<byte>(), null).ConfigureAwait(false);
+
+                // 止めた移動の要求は、完了の通知が来ないことがあるため、完了していない要求から外す(待機が終わらなくなるため)
+                pendingRequests.TryRemove(request, out _);
+                navigationBlocked.TrySetResult(true);
                 return;
             }
 
@@ -316,6 +435,24 @@ namespace Hanga.Rendering
             }
 
             await RespondAsync(request, response.StatusCode, response.ContentType, response.Body, response.Headers).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 止める移動か。ページ全体の移動は、帳票の URL への最初の 1 回だけを通す(フレームが分からない場合はページ全体として扱い、止める側に倒す)。
+        /// 内側のフレームは、GET 以外(フォームの送信)を止める。
+        /// </summary>
+        private bool ShouldBlockNavigation(IRequest request)
+        {
+            bool mainFrame = request.Frame == null || request.Frame == Page.MainFrame;
+            if (!mainFrame)
+            {
+                return Method(request) != "GET";
+            }
+
+            bool isReport = Uri.TryCreate(request.Url, UriKind.Absolute, out Uri? uri)
+                && IsVirtualOrigin(uri)
+                && Uri.UnescapeDataString(uri.AbsolutePath) == ReportPath;
+            return !(isReport && Interlocked.CompareExchange(ref reportNavigationStarted, 1, 0) == 0);
         }
 
         private async Task BlockAsync(IRequest request)

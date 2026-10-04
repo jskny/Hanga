@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    エッジケースの検証で使う帳票ライブラリ(Razor クラスライブラリ)。Hanga.EdgeCases から参照し、
+    ViewAssemblies を指定しなくても、ビューと静的Webアセット(/_content/Hanga.EdgeCases.Library/...)が使えることを確かめる(ケース V09)。
+  -->
+  <PropertyGroup>
+    <RootNamespace>Hanga.EdgeCases.Library</RootNamespace>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

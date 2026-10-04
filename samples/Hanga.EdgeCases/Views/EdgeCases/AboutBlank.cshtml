@@ -1,0 +1,6 @@
+@model EdgeModel
+@* 要求を出さない移動(about:blank)で帳票のページから離れる画面 *@
+<p>元のページ</p>
+@section Scripts {
+    <script>setTimeout(function () { location.href = "about:blank"; }, 100);</script>
+}

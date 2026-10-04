@@ -64,14 +64,38 @@ namespace Hanga.EdgeCases
             yield return new Scenario("J01", "JavaScript", "表示時に alert()", "成功。ダイアログで止まらず、後続の処理が反映される。Dialog の警告", c =>
                 c.ExpectPdfAsync("J01", c.Pdf("Alert"), new[] { "alert の後" }, expectedWarning: HangaWarningKind.Dialog));
 
-            yield return new Scenario("J02", "JavaScript", "表示時に confirm()", "成功。ダイアログで止まらず「OK」を選んだ扱い(true)。Dialog の警告", c =>
-                c.ExpectPdfAsync("J02", c.Pdf("Confirm"), new[] { "confirm の後 true" }, expectedWarning: HangaWarningKind.Dialog));
+            yield return new Scenario("J02", "JavaScript", "表示時に confirm()", "成功。ダイアログで止まらず「キャンセル」を選んだ扱い(false。確認の後の処理を実行させない)。Dialog の警告", c =>
+                c.ExpectPdfAsync("J02", c.Pdf("Confirm"), new[] { "confirm の後 false" }, expectedWarning: HangaWarningKind.Dialog));
 
             yield return new Scenario("J03", "JavaScript", "表示時に window.print()", "成功", c =>
                 c.ExpectPdfAsync("J03", c.Pdf("Print"), new[] { "print の後" }));
 
             yield return new Scenario("J04", "JavaScript", "表示の後に別の URL へ移動", "成功。移動を止めて元のページを PDF にし、BlockedNavigation の警告(別の内容の PDF を黙って返さない)", c =>
                 c.ExpectPdfAsync("J04", c.Pdf("NavigateAway"), new[] { "移動する前のページ" }, expectedWarning: HangaWarningKind.BlockedNavigation));
+
+            yield return new Scenario("J11", "JavaScript", "別のウィンドウ・target=_blank・WebSocket で許可していない宛先へ送る", "宛先に通信が届かない。BlockedNavigation の警告", async c =>
+            {
+                var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+                listener.Start();
+                try
+                {
+                    string target = "http://127.0.0.1:" + ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+                    Check check = await c.ExpectPdfAsync("J11", c.Pdf("Exfiltrate", new EdgeModel { Text = target }), new[] { "持ち出しの試み" },
+                        expectedWarning: HangaWarningKind.BlockedNavigation);
+                    await Task.Delay(1000);
+                    return listener.Pending() ? Check.Fail(check.Actual + "。許可していない宛先に通信が届いた") : check;
+                }
+                finally
+                {
+                    listener.Stop();
+                }
+            });
+
+            yield return new Scenario("J12", "JavaScript", "要求を出さない移動(about:blank)", "HangaBrowserException(白紙の PDF を返さない)", c =>
+                c.ExpectThrowsAsync<HangaBrowserException>(() => c.Pdf("AboutBlank").ToBytesAsync()));
+
+            yield return new Scenario("J13", "JavaScript", "内側のフレームが表示時にフォームを送信", "成功。送信は止めて BlockedNavigation の警告", c =>
+                c.ExpectPdfAsync("J13", c.Pdf("FramePost"), new[] { "フレームを含むページ" }, expectedWarning: HangaWarningKind.BlockedNavigation));
 
             yield return new Scenario("J05", "JavaScript", "無限ループ", $"HangaTimeoutException(待機の上限 {EdgeContext.TimeoutSeconds} 秒で)", c =>
                 c.ExpectThrowsAsync<HangaException>(() => c.Pdf("InfiniteLoop").ToBytesAsync(), maxSeconds: EdgeContext.TimeoutSeconds + 10));
@@ -109,7 +133,7 @@ namespace Hanga.EdgeCases
                 c.ExpectThrowsAsync<HangaViewRenderingException>(() => c.Pdf("MissingSection").ToBytesAsync()));
 
             yield return new Scenario("V03", "ビュー", "部分ビュー(タグヘルパーと PartialAsync)", "成功", c =>
-                c.ExpectPdfAsync("V03", c.Pdf("Component", new EdgeModel { Text = "注記" }), new[] { "部分ビュー:注記", "部分ビュー:注記(非同期)" }));
+                c.ExpectPdfAsync("V03", c.Pdf("Partials", new EdgeModel { Text = "注記" }), new[] { "部分ビュー:注記", "部分ビュー:注記(非同期)" }));
 
             yield return new Scenario("V04", "ビュー", "エリアのビュー(パスで指定)", "成功", c =>
                 c.ExpectPdfAsync("V04", new Cshtml2Pdf(c.Batch, "Reports", "~/Areas/Admin/Views/Reports/AreaReport.cshtml", new EdgeModel { Text = "管理" }), new[] { "エリアのビュー:管理" }));
@@ -126,6 +150,35 @@ namespace Hanga.EdgeCases
 
             yield return new Scenario("V08", "ビュー", "モデルの型の誤り", "HangaViewRenderingException", c =>
                 c.ExpectThrowsAsync<HangaViewRenderingException>(() => new Cshtml2Pdf(c.Batch, "EdgeCases", "Text", "文字列のモデル").ToBytesAsync()));
+
+            yield return new Scenario("V09", "ビュー", "参照する帳票ライブラリのビューと静的Webアセット(ViewAssemblies を指定しない)",
+                "成功。ライブラリの CSS(/_content/Hanga.EdgeCases.Library/...)も反映される(.NET 6 以降のランタイムでは静的Webアセットの一覧を読まないため、CSS は確かめない)", async c =>
+            {
+                bool net5 = Environment.Version.Major == 5;
+                try
+                {
+                    HangaPdfDocument document = await new Cshtml2Pdf(c.Batch, "Library", "FromLibrary").GenerateAsync();
+                    await File.WriteAllBytesAsync(c.OutputPath("V09.pdf"), document.Content);
+                    var info = PdfInfo.Read(document.Content);
+                    if (!info.Contains("帳票ライブラリのビュー"))
+                    {
+                        return Check.Fail("ライブラリのビューの内容が無い");
+                    }
+
+                    return info.Contains("(ライブラリのCSS適用)")
+                        ? Check.Ok($"成功(ビューと CSS。ランタイム {Environment.Version})")
+                        : Check.Fail("ライブラリの CSS が反映されていない");
+                }
+                catch (HangaResourceRequestException ex) when (!net5)
+                {
+                    // .NET 6 以降のランタイム(この開発環境の RollForward)では、.NET 5 形式の静的Webアセットの一覧が読まれない(docs/開発環境メモ.md)
+                    return Check.Ok($"ビューは見つかった。CSS はこのランタイム({Environment.Version})では確かめられない: {Program.OneLine(ex.Message)}");
+                }
+                catch (Exception ex)
+                {
+                    return Check.Fail("例外: " + EdgeContext.Describe(ex));
+                }
+            });
 
             // ---- 保存・並行・寿命 ----
             yield return new Scenario("P01", "保存", "日本語・空白入りの保存先のファイル名", "成功", async c =>

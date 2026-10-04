@@ -84,7 +84,7 @@ dotnet format
 # 呼び出し元の開発環境(Visual Studio 2019)と同じC#コンパイラ(Roslyn 3.11)でビルドできるか確かめる
 dotnet build --no-incremental -p:HangaVs2019Compiler=true
 
-# エッジケースの検証(終了コード = 期待と違う結果の件数)
+# エッジケースの検証(終了コード = 期待と違う結果の件数。引数の誤りは -1)
 dotnet run --project samples/Hanga.EdgeCases -- --chromium <Chromium> --arg --no-sandbox --gaiji-font IPAmj明朝
 
 # Chromium 更新前の検証ツール(サンプルの帳票の基準を作る/比べる)

@@ -1,0 +1,2 @@
+body { font-family: "IPAGothic", "MS PGothic", sans-serif; }
+.library::after { content: "(ライブラリのCSS適用)"; }

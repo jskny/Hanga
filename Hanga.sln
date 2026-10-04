@@ -39,6 +39,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hanga.TestReports", "tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hanga.EdgeCases", "samples\Hanga.EdgeCases\Hanga.EdgeCases.csproj", "{5409B273-F896-4EE6-8AE5-481511424BA5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hanga.EdgeCases.Library", "samples\Hanga.EdgeCases.Library\Hanga.EdgeCases.Library.csproj", "{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -217,6 +219,18 @@ Global
 		{5409B273-F896-4EE6-8AE5-481511424BA5}.Release|x64.Build.0 = Release|Any CPU
 		{5409B273-F896-4EE6-8AE5-481511424BA5}.Release|x86.ActiveCfg = Release|Any CPU
 		{5409B273-F896-4EE6-8AE5-481511424BA5}.Release|x86.Build.0 = Release|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Debug|x64.Build.0 = Debug|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Debug|x86.Build.0 = Debug|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Release|x64.ActiveCfg = Release|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Release|x64.Build.0 = Release|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Release|x86.ActiveCfg = Release|Any CPU
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -236,5 +250,6 @@ Global
 		{0D18EC2E-3C99-45F1-8BB4-88616B848210} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 		{ED0D8B2F-6530-4094-92CA-DCE3230FB6ED} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{5409B273-F896-4EE6-8AE5-481511424BA5} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
+		{4CAD9B5A-5FD0-426A-AC2B-7229EE02B6AF} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal

@@ -69,7 +69,7 @@ namespace Hanga.Tests
             // 要件2.2(エッジケースの検証で見つかった不具合): アプリの名前が Hanga になり、自動ではビューが見つからなかった。
             // ビューの自動の発見はアプリの名前のアセンブリ(と関連するビューのアセンブリ)から始まる。テストでは実行ファイルが testhost になるため、
             // 帳票ライブラリをアプリの名前として与え、ViewAssemblies を指定せずにビューが見つかることを確かめる
-            // (Web の SDK のバッチが参照するライブラリを見つけることは、samples/Hanga.EdgeCases の実行で確かめる)
+            // (Web の SDK のバッチが参照するライブラリを見つけることは、samples/Hanga.EdgeCases のケース V09 で確かめる)
             await using var batch = await HangaBatch.StartAsync(HangaBatchFixture.NewOptions(), b =>
             {
                 b.ApplicationName = typeof(InvoiceModel).Assembly.GetName().Name;

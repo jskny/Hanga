@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -100,7 +102,11 @@ namespace Hanga.Rendering
             IBrowser current = await GetBrowserAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await current.CreateBrowserContextAsync().ConfigureAwait(false);
+                // 帳票ごとのコンテキストには、起動引数のプロキシの除外の指定が引き継がれないため、コンテキストにも同じ指定を渡す(要件3.4)
+                BrowserContextOptions? contextOptions = UsesBlackHoleProxy(options)
+                    ? new BrowserContextOptions { ProxyServer = BlackHoleProxy, ProxyBypassList = ProxyBypassList(options) }
+                    : null;
+                return await current.CreateBrowserContextAsync(contextOptions).ConfigureAwait(false);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is HangaException))
             {
@@ -172,6 +178,38 @@ namespace Hanga.Rendering
             }
         }
 
+        /// <summary>
+        /// Chromium の起動引数。呼び出し元の引数に加えて、許可した外部ホスト以外への通信を、行き止まりのプロキシ(127.0.0.1:9)に向ける(要件3.4)。
+        /// ページへの要求の介入は帳票のページの要求にしか効かず、別のウィンドウ(window.open・target=_blank)や WebSocket の通信は介入を通らないため、
+        /// その抜け道をふさぐ多重の守り(セキュリティレビューの指摘)。Hanga が自分で応える仮想オリジンへの要求はネットワークに出ないため影響しない。
+        /// 呼び出し元が --proxy-server を指定した場合(社内のプロキシが必要な環境)は加えない。
+        /// </summary>
+        internal static List<string> BuildArguments(HangaOptions options)
+        {
+            var args = new List<string>(options.ChromiumArguments);
+            if (UsesBlackHoleProxy(options))
+            {
+                args.Add("--proxy-server=" + BlackHoleProxy);
+                args.Add("--proxy-bypass-list=" + string.Join(";", ProxyBypassList(options)));
+            }
+
+            return args;
+        }
+
+        /// <summary>行き止まりのプロキシを使うか(呼び出し元が --proxy-server を指定していなければ使う)。</summary>
+        internal static bool UsesBlackHoleProxy(HangaOptions options) =>
+            !options.ChromiumArguments.Any(a => a.StartsWith("--proxy-server", StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// プロキシを通さない(直接つなぐ)宛先: 許可した外部ホストだけ。<c>&lt;-loopback&gt;</c> は、Chromium が既定でプロキシを通さない
+        /// ループバック(localhost・127.0.0.1)も、行き止まりのプロキシに向ける指定。
+        /// </summary>
+        internal static string[] ProxyBypassList(HangaOptions options) =>
+            options.AllowedExternalHosts.Select(h => h.Trim()).Where(h => h.Length > 0).Concat(new[] { "<-loopback>" }).ToArray();
+
+        /// <summary>行き止まりのプロキシ(discard のポート。接続はすぐに拒否される)。</summary>
+        internal const string BlackHoleProxy = "http://127.0.0.1:9";
+
         private async Task<IBrowser> LaunchAsync()
         {
             string path = options.ChromiumExecutablePath;
@@ -192,7 +230,7 @@ namespace Hanga.Rendering
                     Headless = true,
                     ExecutablePath = path,
                     UserDataDir = userDataDir,
-                    Args = options.ChromiumArguments.ToArray(),
+                    Args = BuildArguments(options).ToArray(),
                 };
                 launched = await Puppeteer.LaunchAsync(launchOptions).ConfigureAwait(false);
                 BrowserVersion = await launched.GetVersionAsync().ConfigureAwait(false);

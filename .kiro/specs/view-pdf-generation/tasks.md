@@ -3,8 +3,8 @@
 対象要件: `.kiro/specs/view-pdf-generation/requirements.md`
 対象設計: `.kiro/specs/view-pdf-generation/design.md`
 
-> **状況**: タスク1〜13 完了(2026-10-04)。タスク14(Windows Server の検証環境での確認)は利用部門の環境で行う。
-> `dotnet build` / `dotnet test`(132件)/ `dotnet format` はグリーン。VS2019 と同じコンパイラ(Roslyn 3.11)でのビルドとテストもグリーン。
+> **状況**: タスク1〜13・15 完了(2026-10-04)。タスク14(Windows Server の検証環境での確認)は利用部門の環境で行う。
+> `dotnet build` / `dotnet test`(175件。タスク15の時点)/ `dotnet format` はグリーン。VS2019 と同じコンパイラ(Roslyn 3.11)でのビルドとテストもグリーン。
 > code-reviewer・security-reviewer によるレビューを行い、指摘(PuppeteerSharp の例外の包み込み、帳票ごとの取り消し、出力の直前の確認、
 > 許可した外部ホストへの要求の失敗、Chromium の終了のタイミング、入れ子の検出、応答の合計の上限、ログの詳細の扱いなど)に対応した(design.md「レビューを受けて加えた設計」)。
 > 見送った提案(`--host-resolver-rules` による多重の防御)は design.md「未検証の事項」に記録した。
@@ -206,10 +206,15 @@
     - _Requirements: 11_
 
 - [x] 15. エッジケースの検証で見つかった問題への対応(2026-10-04。`samples/Hanga.EdgeCases`)
-  - [x] 15.1 ダイアログ(`alert`・`confirm`・`prompt`)を「OK」で閉じて警告にする
+  - [x] 15.1 ダイアログを閉じて警告にする(`alert` は「OK」、確認を求めるものは「キャンセル」。セキュリティレビューを受けて変更)
     - _Requirements: 4.6, 8.6, 8.7_
-  - [x] 15.2 帳票を開いた後のページ全体の移動を止めて、元のページを PDF にし、警告にする
+  - [x] 15.2 帳票を開いた後のページ全体の移動・内側のフレームのフォームの送信・別のウィンドウを止めて、元のページを PDF にし、警告にする。帳票のページから離れたらエラーにする
     - _Requirements: 2.7, 8.6, 8.7_
+  - [x] 15.5 別のウィンドウ・WebSocket の通信を、行き止まりのプロキシで止める(以前からの抜け道。セキュリティレビューで再現)
+    - _Requirements: 3.4_
+  - [x] 15.6 印刷中に起きた問題の確認、警告の件数と長さの上限(コードレビュー・セキュリティレビューの指摘)
+    - _Requirements: 8.4, 8.6, 8.7_
   - [x] 15.3 1ページ化で用紙の高さの上限を超えた場合に警告にする
     - _Requirements: 5.5, 8.6, 8.7_
   - [x] 15.4 回帰テスト(`tests/Hanga.Rendering.Tests/EdgeCaseTests.cs`)
+    - _Requirements: 2.7, 3.4, 4.6, 5.5, 8.7_
