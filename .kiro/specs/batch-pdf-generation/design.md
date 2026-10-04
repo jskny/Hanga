@@ -32,7 +32,7 @@
 
 ## プロジェクト構成とレイヤー
 
-新しいプロジェクトは作らない。バッチ用の部品はファサード `Hanga` に置く(ASP.NET Core のホストを扱うため)。
+新しいプロジェクトは作らない。バッチ用の部品はファサード `Hanga` に置く(ASP.NET Coreのホストを扱うため)。
 
 | 置き場所 | 型 | 公開 | 内容 |
 |---|---|---|---|
@@ -41,11 +41,11 @@
 | `src/Hanga/` | `Cshtml2Pdf` | 公開(変更) | バッチ用のコンストラクターを加える。ファイルへの保存を一時ファイル経由にする |
 | `src/Hanga/Hosting/` | `BatchHostBuilder` | internal | Webサーバーを持たないホストの組み立て |
 | `src/Hanga/Hosting/` | `NoopServer` | internal | ポートを開かない `IServer` の実装 |
-| `src/Hanga/Hosting/` | `RequestSnapshot` | internal(変更) | バッチ用に、`HttpContext` から写し取る(既存の `From` をそのまま使う) |
+| `src/Hanga/Hosting/` | `RequestSnapshot` | internal(変更なし) | バッチでも、帳票1件用の `HttpContext` から既存の `From` で写し取る |
 
 - `Hanga.Core`・`Hanga.Templating`・`Hanga.Rendering` は変更しない。
-- 公開APIに出す型は、ASP.NET Core の型(`IServiceCollection`)と .NET の型(`Assembly`)に限り、PuppeteerSharp の型を出さない(要件6.3)。
-- 新しい依存ライブラリは加えない(要件6.1)。使う ASP.NET Core の機能(汎用ホスト・`IServer`・静的ファイル・静的Webアセット)は、すべて共有フレームワーク `Microsoft.AspNetCore.App` 5.0 に含まれる。
+- 公開APIに出す型は、ASP.NET Coreの型(`IServiceCollection`)と .NET の型(`Assembly`)に限り、PuppeteerSharp の型を出さない(要件6.3)。
+- 新しい依存ライブラリは加えない(要件6.1)。使う ASP.NET Coreの機能(汎用ホスト・`IServer`・静的ファイル・静的Webアセット)は、すべて共有フレームワーク `Microsoft.AspNetCore.App` 5.0 に含まれる。
 
 ## 公開API
 
@@ -92,6 +92,7 @@ foreach (var customer in customers)
         // 失敗の扱い(飛ばす・止める・記録する)はバッチ側で決める(要件4.3)
         logger.LogError(ex, "帳票を作れませんでした: {Customer}", customer.Id);
     }
+    // ファイルの書き込みの失敗(IOException・UnauthorizedAccessException)は Hanga の例外に包まずに出る(要件4.3)
 }
 ```
 
@@ -113,7 +114,7 @@ foreach (var customer in customers)
 | `StaticFileMappings` | 空 | URLのパス(`/` で始まる)→ フォルダ の対応の追加(要件3.3)。Webアプリの発行先の `wwwroot` を直接使う場合などに使う |
 | `ConfigureServices` | null | ホストの依存性注入への追加の登録(ビューが `@inject` で使うサービス、ログの出力先、`WebEncoderOptions` など。要件2.5) |
 
-`StartAsync` の時点で検証し、誤り(`WebRootPath`・`StaticFileMappings` のフォルダが無い、URLのパスが `/` で始まらない)は、すべての誤りを含めて `HangaConfigurationException` にする。
+`StartAsync` の時点で検証し、誤り(`ContentRootPath`・`WebRootPath`・`StaticFileMappings` のフォルダが無い、URLのパスが `/` で始まらない、`ViewAssemblies` に null がある)は、すべての誤りを含めて `HangaConfigurationException` にする。
 `HangaOptions` の検証(`Validate`)も同じ時点で行う。
 
 ## 各部の設計
@@ -133,7 +134,7 @@ foreach (var customer in customers)
 6. ホストを起動し(`StartAsync`)、続けて Chromium を起動する(`WarmUpAsync`。要件1.3)。失敗した場合はホストを停止・破棄してから例外を投げる。
 
 - ルーティング(`UseRouting`・`UseEndpoints`)は、タグヘルパーの URL の生成(`asp-controller`/`asp-action`)に必要(検証レポート「6.4」)。
-  バッチにコントローラーが無い場合、生成される URL は空になる(帳票では通常使わない)。
+  バッチにコントローラーが無い場合、生成される URL は空になると考えられる(未確認。帳票では通常使わない)。
 - 環境名は既定(`Production`)のまま。レイアウトの `<environment>` タグヘルパーは本番と同じ側が選ばれる。
 - ホストの設定ファイル(`appsettings.json`)・環境変数は読まない(Hanga の設定は `HangaOptions` で受け取る)。ログの出力先は `ConfigureServices` で登録する。
 
@@ -157,6 +158,7 @@ foreach (var customer in customers)
 2. 保存先と同じフォルダに、一時ファイル(`<保存先のファイル名>.<ランダムな文字列>.tmp`)を作って書き込む。
 3. `File.Move(一時ファイル, 保存先, overwrite: true)` で保存先の名前に変える。同じフォルダ内の名前の変更のため、途中までのPDFが保存先に見えることは無い。
 4. 2・3 で例外(取り消しを含む)が起きた場合は、一時ファイルを削除してから例外を投げ直す。既にある保存先のファイルは変わらない。
+   書き込み・名前の変更の失敗は `IOException` などのまま投げる(Hangaの例外に包まない。要件4.3)。
 
 Webアプリで使う場合の `SaveAsync` も同じ処理になる(中核機能の要件7.1 の改善。Webアプリの動作に影響は無い)。
 
@@ -202,7 +204,8 @@ Hanga は失敗の方針を持たず、帳票1件ごとに中核機能の例外(
   - モデルの値・CSS・JavaScript が PDF に反映されること、`@inject` のサービスが使えること
   - 並行して生成した帳票に、それぞれのモデルの値だけが入ること
   - ビューが無い・ビューの例外・存在しない静的ファイルの要求で、原因の分かる例外になり、その後の帳票は正常に生成できること
-  - 生成の途中で Chromium のプロセスが終了しても、次の帳票は生成できること
+  - 帳票の生成の合間に Chromium のプロセスが終了していても、次の帳票は生成できること
+  - ビューがセッションを使うと `HangaViewRenderingException` になること
   - `SaveAsync`: 失敗・取り消しで保存先にファイルができず、既存のファイルが壊れず、一時ファイルが残らないこと
   - 設定の誤り(フォルダが無い、Chromium が無い)が `StartAsync` で例外になること、終了後の利用が `ObjectDisposedException` になること
   - 処理時間(1件ずつ・並行)の計測
@@ -212,20 +215,20 @@ Hanga は失敗の方針を持たず、帳票1件ごとに中核機能の例外(
 
 2026年10月4日、この開発環境(Linux)で、`spikes/batch-rcl-verification/` を使って確かめた。詳細は検証レポート「6.5」。
 
-| バッチの SDK・実行のしかた | ビューの発見 | `/_content/Reports/css/report.css` |
-|---|---|---|
-| `Microsoft.NET.Sdk`、ビルドの出力 | 自動では見つからない。アセンブリを指定すれば見つかる | 404(静的Webアセットの一覧が作られない) |
-| `Microsoft.NET.Sdk`、発行 | 同上 | 404(`wwwroot/css/report.css` に置かれ、`_content` の下に無い) |
-| `Microsoft.NET.Sdk.Web`、ビルドの出力、.NET 5.0.17 のランタイム | 自動で見つかる | 200(静的Webアセットの一覧 `BatchWeb.StaticWebAssets.xml` から) |
-| `Microsoft.NET.Sdk.Web`、ビルドの出力、.NET 10 のランタイム(`RollForward`) | 自動で見つかる | 404(.NET 10 は新しい形式の一覧しか読まない。テスト環境だけの事情) |
-| `Microsoft.NET.Sdk.Web`、発行 | 自動で見つかる | 200(`wwwroot/_content/Reports/css/report.css`)。`asp-append-version` も付いた |
+| バッチの SDK | 実行のしかた | ビューの発見 | `/_content/Reports/css/report.css` |
+|---|---|---|---|
+| `Microsoft.NET.Sdk` | ビルドの出力 | 自動では見つからない。アセンブリを指定すれば見つかる | 404(静的Webアセットの一覧が作られない) |
+| `Microsoft.NET.Sdk` | 発行 | 同上 | 404(`wwwroot/css/report.css` に置かれ、`_content` の下に無い) |
+| `Microsoft.NET.Sdk.Web` | ビルドの出力、.NET 5.0.17 のランタイム(自己完結型) | 自動で見つかる | 200(静的Webアセットの一覧 `BatchWeb.StaticWebAssets.xml` から) |
+| `Microsoft.NET.Sdk.Web` | ビルドの出力、.NET 10 のランタイム(`RollForward`) | 自動で見つかる | 404(.NET 10 は新しい形式の一覧しか読まない。テスト環境だけの事情) |
+| `Microsoft.NET.Sdk.Web` | 発行 | 自動で見つかる | 200(`wwwroot/_content/Reports/css/report.css`)。`asp-append-version` も付いた |
 
 - 帳票ライブラリのビューは、.NET 5 の Razor SDK では別のアセンブリ(`Reports.Views.dll`)にコンパイルされる。アセンブリを指定する場合は、関連するビューのアセンブリも加える必要があった。
-- 処理時間の目安は、実装後に計測して下表に記録する(要件5.3)。
+- 処理時間の目安は、下の「処理時間の目安」を参照(要件5.3)。
 
 ### 処理時間の目安(要件5.3)
 
-2026年10月4日、この開発環境(CPU 4コア、Linux、Chromium 141)で、テスト用の帳票ライブラリの帳票(レイアウト・部分ビュー・CSS・JavaScript)を
+2026年10月4日、この開発環境(CPU 4コア、Linux、Chrome 141)で、テスト用の帳票ライブラリの帳票(レイアウト・部分ビュー・CSS・JavaScript)を
 `HangaBatch` で生成して計測した(`tests/Hanga.Tests/BatchLifetimeTests.cs` の「帳票1件あたりの時間」)。`MaxConcurrentRenders` は既定の4。
 
 | 場合 | 時間 |

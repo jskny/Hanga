@@ -80,6 +80,9 @@ namespace Hanga.Tests
                 () => new Cshtml2Pdf(batch, "Invoice", "Broken").ToBytesAsync());
             Assert.Equal(HangaStage.ViewRendering, broken.Stage);
 
+            // バッチにはセッションが無い(design.md「帳票1件用の HttpContext」)
+            await Assert.ThrowsAsync<HangaViewRenderingException>(() => new Cshtml2Pdf(batch, "Invoice", "UsesSession").ToBytesAsync());
+
             var missing = await Assert.ThrowsAsync<HangaResourceRequestException>(
                 () => new Cshtml2Pdf(batch, "Invoice", "MissingAsset", HangaBatchFixture.Invoice("B")).ToBytesAsync());
             Assert.Contains(missing.FailedRequests, f => f.Url.EndsWith("/_content/Hanga.TestReports/css/missing.css", StringComparison.Ordinal) && f.StatusCode == 404);

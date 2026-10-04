@@ -203,6 +203,7 @@ ASP.NET Core のアプリでは、複数のオペレーターのPDF用アクシ�
 - 1帳票あたりの生成時間・同時実行数(Chromiumのプロセスを使い回すか、帳票ごとに起動するか)。
 
 - 実際の帳票ビュー・レイアウト・API呼び出しでの動作(今回はサンプルのビューと、既定に近いレイアウト、検証用のAPIで確認した)。
+- バッチ: Windows 上で発行したバッチの動作、Visual Studio 2019 で作った帳票ライブラリ・バッチでの動作、タスクスケジューラからの Chromium の起動(`.kiro/specs/batch-pdf-generation/design.md`「未検証の事項」)。
 
 検証コードは `spikes/pdf-output-verification/` にあり、Windows Serverでもそのまま使える。結果は本節と `.kiro/specs/` の設計書に反映する。
 

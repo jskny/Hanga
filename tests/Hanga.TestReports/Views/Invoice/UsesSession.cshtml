@@ -1,0 +1,3 @@
+@using Microsoft.AspNetCore.Http
+@* バッチにはセッションが無い。使うと描画中の例外になる(batch-pdf-generation の design.md「帳票1件用の HttpContext」) *@
+<p>@Context.Session.GetString("operator")</p>

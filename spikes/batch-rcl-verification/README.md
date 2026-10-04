@@ -9,6 +9,8 @@
 
 ## 実行
 
+`spikes/batch-rcl-verification/` で実行する。
+
 ```bash
 # ビルドの出力から(引数 explicit でビューのアセンブリを明示的に加える)
 dotnet build BatchWeb && dotnet BatchWeb/bin/Debug/net5.0/BatchWeb.dll [explicit]
