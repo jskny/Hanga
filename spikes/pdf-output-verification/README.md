@@ -11,6 +11,7 @@ Windows Server の検証環境で同じ確認をするときにも使う。
 - `inproc/` — Cookie認証のAPIから表示時に値を取得するビューを、PDF用エンドポイント(`/order/pdf`)からPDFにする。
   仮想オリジンへの要求をアプリのパイプラインにプロセス内で渡し、オペレーターのCookieを引き継ぐ。
   実行例: `dotnet run -- <chromeの実行ファイル>` の後、`curl -c jar.txt http://127.0.0.1:5079/login` → `curl -b jar.txt -o order.pdf http://127.0.0.1:5079/order/pdf`
+  `concurrent-test.sh` は、8人のオペレーターの同時要求で値が取り違えられないかを確かめる。
 - `razorlight-mvc-view/` — 上記と同じ `Views` を RazorLight で展開してみる確認用。実行例: `dotnet run -- ../mvc/Views`
 
 ## 準備

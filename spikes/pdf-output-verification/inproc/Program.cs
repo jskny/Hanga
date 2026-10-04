@@ -64,7 +64,7 @@ namespace InProc
                     {
                         e.MapGet("/login", async ctx =>
                         {
-                            var id = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "operator1") }, CookieAuthenticationDefaults.AuthenticationScheme);
+                            var id = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, ctx.Request.Query["user"].ToString()) }, CookieAuthenticationDefaults.AuthenticationScheme);
                             await ctx.SignInAsync(new ClaimsPrincipal(id));
                             await ctx.Response.WriteAsync("logged in");
                         });

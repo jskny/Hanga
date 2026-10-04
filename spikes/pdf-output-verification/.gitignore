@@ -7,3 +7,5 @@ pdf/
 *.log
 *.pdf
 console/wwwroot/fonts/*.ttf
+concurrent/
+concurrent.log

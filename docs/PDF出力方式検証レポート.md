@@ -311,6 +311,16 @@ ASP.NET Core の列は、自己完結型で発行した ASP.NET Core 5.0.17 上�
 - 要求ごとに作る `HttpContext` に何を引き継ぐか(`Cookie` 以外のヘッダー、`Host`、言語設定など)と、アプリのミドルウェアが仮の要求に対して想定外の動きをしないか
   (HTTPSへのリダイレクト、Antiforgery、ログ出力など)は、設計時に確認する。
 
+### 8.4 同時実行(スレッドセーフ)
+
+検証日: 2026年10月4日。検証コード: `spikes/pdf-output-verification/inproc/concurrent-test.sh`
+
+8人のオペレーター(user1〜user8)がそれぞれログインし、同時に `/order/pdf` を要求した。検証コードは帳票ごとにChromiumを起動する作り。
+
+- 8件とも200で返り、**各PDFには本人の権限でAPIから取得した値(「userN が取得」)が入っていた。取り違えは無かった。**
+- 1件あたり約10秒かかった(8つのChromiumが同時に起動したため。1件だけの場合は数秒)。
+- 各要求をアプリのパイプラインに渡す処理は、要求ごとに `HttpContext` と依存性注入のスコープを作っており、ASP.NET Core が通常の同時リクエストを処理するのと同じ形になる。
+
 ## 9. 未検証の事項
 
 この開発環境はLinuxのため、次の点は Windows Server の検証環境で確認する必要がある。検証コードはそのまま使える(`spikes/pdf-output-verification/README.md`)。
@@ -320,7 +330,7 @@ ASP.NET Core の列は、自己完結型で発行した ASP.NET Core 5.0.17 上�
 - **IISのアプリケーションプールのユーザーからのChromium起動**。検証コードは root で動かすため `--no-sandbox` を付けている。Windowsではサンドボックスを有効にしたまま起動できるかを確認する。
 - 本番に置くChromium(Google Chrome / Chrome for Testing / Microsoft Edge 等)での動作。
 - 実際の帳票テンプレート(呼び出し元アプリの既存ビュー)とレイアウトでの動作。今回は提示された例と、既定の形に近いレイアウトで確認した。
-- 同時に複数の帳票を生成した場合の性能と安定性。
+- Chromiumを使い回す方式での同時実行(8.4はリクエストごとにChromiumを起動する方式で確認した)と、多数の同時要求での性能・安定性。
 - Windows でのインストール済みフォントの名前での参照(`local('IPAmj明朝')`)。
 - 異体字が指定どおりの字形で描かれるか(「7. 外字・異体字の検証」)。
 - 実際の画面のAPI呼び出し(`fetch` か `XMLHttpRequest` か jQuery か、POSTを使うか、Antiforgery のトークンを使うか)での動作。
