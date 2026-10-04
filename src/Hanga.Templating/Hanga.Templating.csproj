@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hanga.Templating</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ビューのHTML化に ASP.NET Core MVC のビュー描画機能を使う(tech.md「① テンプレート展開」) -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hanga.Core\Hanga.Core.csproj" />
+  </ItemGroup>
+
+</Project>

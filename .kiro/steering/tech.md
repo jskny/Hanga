@@ -102,6 +102,25 @@ CSHTMLテンプレート + モデル
 | `HtmlRenderer.PdfSharp` | 1.6.1 | BSD-3-Clause | netstandard2.0 / net8.0 | HTMLを自前で解釈して `PDFsharp`(MIT)で描画する | 不採用。JavaScriptを実行できない。CSSもHTML 4/CSS 2程度 |
 | 自前のレイアウト + `SkiaSharp` | (Utsushiは2.88.8) | MIT | netstandard2.0 ほか | 対応するHTML/CSSのサブセットを自分で実装する | 不採用。JavaScriptを実行できない |
 
+PuppeteerSharp 18.1.0 が連れてくる依存パッケージ(2026年10月4日、`Hanga.Rendering` の復元結果で確認):
+
+| パッケージ | 版 | ライセンス |
+|---|---|---|
+| `Newtonsoft.Json` | 13.0.1 | MIT |
+| `Microsoft.Bcl.AsyncInterfaces` | 1.1.0 | MIT |
+| `Microsoft.Extensions.Logging` / `Options` / `Primitives` / `DependencyInjection.Abstractions` | 2.0.x | Apache-2.0 |
+| `System.Runtime.CompilerServices.Unsafe` | 4.4.0 | MIT |
+
+`Microsoft.Extensions.*` は 2.0系で、呼び出し元の ASP.NET Core 5 が持つ 5.0系より古いため、アプリ側の版を置き換えない(共有フレームワークの版が使われる)。
+ビルド時に「`doesn't support net5.0`」の警告は出ない。
+
+テストとツールだけが使うもの(製品のアセンブリからは参照しない):
+
+| パッケージ | 版 | ライセンス | 用途 |
+|---|---|---|---|
+| `PdfPig` | 0.1.16 | Apache-2.0 | テスト・検証ツールでPDFから文字列とページサイズを取り出す(net5.0 で警告なくビルドできることを確認) |
+| `Microsoft.AspNetCore.Mvc.Testing` | 5.0.17 | Apache-2.0 | テストでテスト用アプリをホストする |
+
 除外したもの:
 - `QuestPDF`: Community版に収益上限があり(一定以上の収益がある組織は有償)、ライセンス制約に該当する。またHTMLではなくC#のAPIでレイアウトを書く方式である。
 - `wkhtmltopdf` 系(`DinkToPdf` 等): 本体の開発が終了しており、保守されていない。

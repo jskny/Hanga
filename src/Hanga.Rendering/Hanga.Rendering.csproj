@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hanga.Rendering</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      18.1.0 に固定する。20以降は .NET 5 を公式にサポートしない依存パッケージを連れてくる(tech.md「② PDF出力」)。
+      このプロジェクトは ASP.NET Core に依存しない(design.md「プロジェクト構成とレイヤー」)。
+    -->
+    <PackageReference Include="PuppeteerSharp" Version="18.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hanga.Core\Hanga.Core.csproj" />
+  </ItemGroup>
+
+</Project>

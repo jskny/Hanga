@@ -11,25 +11,28 @@
 > - タスクの文面どおりに実現できなかった場合や、実装中に決めた事項は、各タスクに注記を付け、`design.md` にも反映する(要件・設計からの逸脱は先に仕様側を更新する。`CLAUDE.md`)。
 > - 「(Windows)」が付いたタスクは、この開発環境(Linux)では確認できない。利用部門の検証環境で確認する。
 
-- [ ] 1. 開発基盤
-  - [ ] 1.1 ルートに classic形式の `Hanga.sln`、`Directory.Build.props`(`net5.0`・`LangVersion 9.0`・`Nullable`・EOL警告の抑止・`InternalsVisibleTo`)を作る
+- [x] 1. 開発基盤
+  - [x] 1.1 ルートに classic形式の `Hanga.sln`、`Directory.Build.props`(`net5.0`・`LangVersion 9.0`・`Nullable`・EOL警告の抑止・`InternalsVisibleTo`)を作る
     - `.slnx` を作らないこと、ヘッダーが `# Visual Studio Version 16` であることを確かめる(`structure.md`)
     - _Requirements: 12.1_
-  - [ ] 1.2 `Directory.Build.props` に、VS2019 と同じコンパイラ(`Microsoft.Net.Compilers.Toolset` 3.11.0)へ差し替えるスイッチ(`-p:HangaVs2019Compiler=true`)を加える(Utsushi と同じ仕組み)
+  - [x] 1.2 `Directory.Build.props` に、VS2019 と同じコンパイラ(`Microsoft.Net.Compilers.Toolset` 3.11.0)へ差し替えるスイッチ(`-p:HangaVs2019Compiler=true`)を加える(Utsushi と同じ仕組み)
     - _Requirements: 12.1_
-  - [ ] 1.3 テストプロジェクト共通の設定(`RollForward`、net5.0世代のテストパッケージ)を `Directory.Build.targets` にまとめる
+    - 注記: Web SDK(テスト用アプリ)が加えるアナライザーには `RunAnalyzers=false` が効かず、Roslyn 3.11 で警告 CS8032 が大量に出たため、
+      検証モードではアナライザーの項目を外すターゲットを `Directory.Build.targets` に加えた。
+  - [x] 1.3 テストプロジェクト共通の設定(`RollForward`、net5.0世代のテストパッケージ)を `Directory.Build.targets` にまとめる
     - _Requirements: 12.1_
-  - [ ] 1.4 プロジェクト `Hanga.Core`・`Hanga.Templating`・`Hanga.Rendering`・`Hanga` と、各テストプロジェクトを作り、参照の向きを `Core → Templating → Rendering → Hanga` にする
+  - [x] 1.4 プロジェクト `Hanga.Core`・`Hanga.Templating`・`Hanga.Rendering`・`Hanga` と、各テストプロジェクトを作り、参照の向きを `Core → Templating → Rendering → Hanga` にする
     - `Hanga.Rendering` は ASP.NET Core を参照しないこと(`design.md`「プロジェクト構成とレイヤー」)
     - _Requirements: 12.1_
-  - [ ] 1.5 `Hanga.Rendering` に `PuppeteerSharp` 18.1.0 を追加し、ビルド時に「`doesn't support net5.0`」の警告が出ないことを確かめる。依存パッケージ(`Newtonsoft.Json` 13.0.1 等)のライセンスを `tech.md` に記録する
+  - [x] 1.5 `Hanga.Rendering` に `PuppeteerSharp` 18.1.0 を追加し、ビルド時に「`doesn't support net5.0`」の警告が出ないことを確かめる。依存パッケージ(`Newtonsoft.Json` 13.0.1 等)のライセンスを `tech.md` に記録する
     - _Requirements: 12.2, 12.3_
-  - [ ] 1.6 テスト用の ASP.NET Core 5 MVC アプリ `tests/Hanga.TestApp` を作る(ビュー・レイアウト・`_ViewStart`・静的ファイル・Cookie認証のログイン・認証が必要なAPI)。テストからはテスト用のホストで起動する
+  - [x] 1.6 テスト用の ASP.NET Core 5 MVC アプリ `tests/Hanga.TestApp` を作る(ビュー・レイアウト・`_ViewStart`・静的ファイル・Cookie認証のログイン・認証が必要なAPI)。テストからはテスト用のホストで起動する
     - 検証コード `spikes/pdf-output-verification/inproc/` を元にする
     - _Requirements: 1, 3(以降のタスクのテストで使う)_
-  - [ ] 1.7 CI(GitHub Actions)を作る: Linux で build/test/format と VS2019 コンパイラでのビルド、Windows で .NET 5 SDK 5.0.408 でのビルド。結合テスト用に Chromium の場所を環境変数 `HANGA_TEST_CHROMIUM` で渡す
+  - [x] 1.7 CI(GitHub Actions)を作る: Linux で build/test/format と VS2019 コンパイラでのビルド、Windows で .NET 5 SDK 5.0.408 でのビルド。結合テスト用に Chromium の場所を環境変数 `HANGA_TEST_CHROMIUM` で渡す
     - _Requirements: 12.1_
-  - [ ] 1.8 `.claude/agents/` に、Utsushi のサブエージェント定義(code-investigator・code-reviewer・test-writer・security-reviewer・spec-compliance-reviewer・doc-reviewer)を Hanga 向けに書き換えて置き、`CLAUDE.md` の「サブエージェント」を更新する
+    - 注記: この開発環境では実行できない。初回の実行結果(Actions のログ)で成否を確かめる。
+  - [x] 1.8 `.claude/agents/` に、Utsushi のサブエージェント定義(code-investigator・code-reviewer・test-writer・security-reviewer・spec-compliance-reviewer・doc-reviewer)を Hanga 向けに書き換えて置き、`CLAUDE.md` の「サブエージェント」を更新する
 
 - [ ] 2. Core: 共通の型
   - [ ] 2.1 例外の基底 `HangaException`(段階 `Stage`)と派生7種(`design.md`「例外と警告」)を作る

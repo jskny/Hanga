@@ -51,8 +51,16 @@ Excel帳票をPDF化する姉妹ライブラリ Utsushi(`jskny/Utsushi`)が、�
 
 ## サブエージェント
 
-`.claude/agents/` にはまだサブエージェントを定義していない。
-実装に着手する段階で、Utsushiの `.claude/agents/`(code-investigator / code-reviewer / test-writer / security-reviewer / spec-compliance-reviewer / doc-reviewer など)を参考に、Hangaに合わせて追加する。
+以下は `.claude/agents/` に定義済み。該当する状況でプロアクティブに使用する。
+
+| サブエージェント | 使うタイミング |
+|---|---|
+| `code-investigator` | 実装に着手する前の既存コード調査、バグ調査時の関連コードの特定、影響範囲の洗い出し |
+| `code-reviewer` | 実装の変更が完了した直後、コミットの前 |
+| `test-writer` | 新しい実装・変更した実装にテストが不足している場合 |
+| `security-reviewer` | 要求の転送・認証情報・Chromiumの起動・外部への通信・新しい依存パッケージを扱う変更の後 |
+| `spec-compliance-reviewer` | requirements/design/tasks の作成・更新時、実装の完了後の仕様整合性の確認 |
+| `doc-reviewer` | `.kiro/`・`docs/`・`README.md`・`CLAUDE.md` の追加・更新の直後 |
 
 ## 開発コマンド
 

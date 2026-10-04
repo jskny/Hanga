@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hanga.Tests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="5.0.17" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hanga\Hanga.csproj" />
+    <ProjectReference Include="..\Hanga.TestApp\Hanga.TestApp.csproj" />
+    <ProjectReference Include="..\Hanga.TestSupport\Hanga.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

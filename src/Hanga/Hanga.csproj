@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hanga</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hanga.Core\Hanga.Core.csproj" />
+    <ProjectReference Include="..\Hanga.Templating\Hanga.Templating.csproj" />
+    <ProjectReference Include="..\Hanga.Rendering\Hanga.Rendering.csproj" />
+  </ItemGroup>
+
+</Project>
