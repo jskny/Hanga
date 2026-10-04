@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Hanga のサンプルアプリ(ASP.NET Core 5 MVC)。使い方の例と、Chromium のバージョンアップの検証ツール(tools/Hanga.ChromiumCheck)の対象を兼ねる。
+    サンプルの帳票: 請求書(外部CSS・JavaScript・ログインが必要なAPIからの値・複数ページ)、幅の広い表、外字・異体字。
+  -->
+  <PropertyGroup>
+    <RootNamespace>Hanga.Sample</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hanga\Hanga.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - Hanga サンプル</title>
+    <link rel="stylesheet" href="~/css/report.css" asp-append-version="true" />
+</head>
+<body>
+    <nav class="no-print">Hanga サンプル | <a asp-controller="Reports" asp-action="Invoice">請求書</a></nav>
+    <main>
+        @RenderBody()
+    </main>
+    <script src="~/js/report.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,15 @@
+body { font-family: "IPAGothic", "MS PGothic", sans-serif; font-size: 10.5pt; color: #222; }
+h1 { text-align: center; letter-spacing: 0.5em; border-bottom: 3px double #333; }
+.to .customer { font-size: 14pt; border-bottom: 1px solid #333; display: inline-block; }
+table { border-collapse: collapse; }
+table.lines { width: 100%; }
+table.wide { width: 1600px; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th { background: #dde6f0; }
+th, td { border: 1px solid #555; padding: 2px 6px; }
+.num { text-align: right; }
+.total { font-size: 14pt; text-align: right; }
+@media print {
+    .no-print { display: none; }
+}
