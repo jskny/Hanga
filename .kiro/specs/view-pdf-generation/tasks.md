@@ -4,7 +4,7 @@
 対象設計: `.kiro/specs/view-pdf-generation/design.md`
 
 > **状況**: タスク1〜13・15 完了(2026-10-04)。タスク14(Windows Server の検証環境での確認)は利用部門の環境で行う。
-> `dotnet build` / `dotnet test`(175件。タスク15の時点)/ `dotnet format` はグリーン。VS2019 と同じコンパイラ(Roslyn 3.11)でのビルドとテストもグリーン。
+> `dotnet build` / `dotnet test`(179件。タスク15の時点)/ `dotnet format` はグリーン。VS2019 と同じコンパイラ(Roslyn 3.11)でのビルドとテストもグリーン。
 > code-reviewer・security-reviewer によるレビューを行い、指摘(PuppeteerSharp の例外の包み込み、帳票ごとの取り消し、出力の直前の確認、
 > 許可した外部ホストへの要求の失敗、Chromium の終了のタイミング、入れ子の検出、応答の合計の上限、ログの詳細の扱いなど)に対応した(design.md「レビューを受けて加えた設計」)。
 > 見送った提案(`--host-resolver-rules` による多重の防御)は design.md「未検証の事項」に記録した。

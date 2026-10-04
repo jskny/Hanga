@@ -184,11 +184,106 @@ namespace Hanga.Rendering.Tests
             options.AllowedExternalHosts.Add("cdn.example.com");
             var args = BrowserHost.BuildArguments(options);
             Assert.Contains("--proxy-server=" + BrowserHost.BlackHoleProxy, args);
-            Assert.Contains("--proxy-bypass-list=cdn.example.com;<-loopback>", args);
+            Assert.Contains("--proxy-bypass-list=<-loopback>;cdn.example.com", args); // <-loopback> は先頭(後ろの規則が優先されるため)
 
             // 呼び出し元がプロキシを指定した場合は加えない(社内のプロキシが必要な環境)
-            options.ChromiumArguments.Add("--proxy-server=http://proxy.example.com:8080");
-            Assert.DoesNotContain(BrowserHost.BuildArguments(options), a => a.Contains(BrowserHost.BlackHoleProxy, StringComparison.Ordinal));
+            foreach (string own in new[] { "--proxy-server=http://proxy.example.com:8080", "--proxy-pac-url=http://pac/", "--no-proxy-server" })
+            {
+                var custom = new HangaOptions { ChromiumExecutablePath = "chrome" };
+                custom.ChromiumArguments.Add(own);
+                Assert.DoesNotContain(BrowserHost.BuildArguments(custom), a => a.Contains(BrowserHost.BlackHoleProxy, StringComparison.Ordinal));
+            }
+        }
+
+        [Fact]
+        public async Task 許可したホストには直接つなぐ()
+        {
+            // 行き止まりのプロキシを使っても、許可したホスト(ここではループバック)からは取得できる(要件3.4)
+            using var server = new LoopbackHttpServer("document.getElementById('v').textContent = '許可したホストのスクリプト';");
+            var result = await ReportRendererWaitTests.RenderAsync(
+                ReportRendererWaitTests.Page("<p id='v'>読み込み前</p><script src='" + server.Url + "/a.js'></script>"),
+                new FakeVirtualOriginHandler(),
+                configureGlobal: g =>
+                {
+                    // 帳票のページを https にすると、http のループバックからの読み込みは混在コンテンツとして Chromium に止められるため、http にする
+                    g.VirtualOrigin = "http://hanga.invalid";
+                    g.AllowedExternalHosts.Add("127.0.0.1");
+
+                    // Chromium は、公開のページからローカルのネットワーク(ループバック)への読み込みを止める。このテストではプロキシの除外だけを確かめるため、その制限を外す
+                    g.ChromiumArguments.Add("--disable-features=LocalNetworkAccessChecks,PrivateNetworkAccessForSubresources,BlockInsecurePrivateNetworkRequests");
+                });
+
+            Assert.Contains("許可したホストのスクリプト", PdfInspector.Read(result.Pdf).AllText);
+            Assert.True(server.RequestCount > 0);
+        }
+
+        [Fact]
+        public async Task 起動し直した後も許可していない宛先へ通信できない()
+        {
+            // 起動し直した後のブラウザコンテキストにも、行き止まりのプロキシを指定する(コードレビューの指摘)
+            var global = BrowserHostTests.Options();
+            var glyphs = new GlyphSupport(global);
+            await using var host = new BrowserHost(global, afterLaunch: glyphs.VerifyGaijiFontAsync);
+            var renderer = new ReportRenderer(host, global, glyphs);
+            await renderer.RenderAsync(new ReportRenderInput(ReportRendererWaitTests.Page("<p>1件目</p>"), new Cshtml2PdfOptions(), new FakeVirtualOriginHandler()));
+            host.CurrentBrowser!.Process!.Kill(entireProcessTree: true);
+            host.CurrentBrowser.Process.WaitForExit(10_000);
+
+            using var server = new LoopbackHttpServer(string.Empty);
+            await renderer.RenderAsync(new ReportRenderInput(
+                ReportRendererWaitTests.Page("<p>2件目</p><script>window.open('" + server.Url + "/open'); try { new WebSocket('" + server.Url.Replace("http://", "ws://") + "/ws'); } catch (e) { }</script>"),
+                new Cshtml2PdfOptions(),
+                new FakeVirtualOriginHandler()));
+            await Task.Delay(1000);
+
+            Assert.Equal(2, host.LaunchCount);
+            Assert.Equal(0, server.RequestCount);
+        }
+
+        /// <summary>ループバックで待ち受け、届いた要求の数を数えて、固定の本文(JavaScript)を返す。</summary>
+        private sealed class LoopbackHttpServer : IDisposable
+        {
+            private readonly TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
+            private readonly string body;
+            private int requestCount;
+
+            public LoopbackHttpServer(string body)
+            {
+                this.body = body;
+                listener.Start();
+                Url = "http://127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port;
+                _ = AcceptLoopAsync();
+            }
+
+            public string Url { get; }
+
+            public int RequestCount => System.Threading.Volatile.Read(ref requestCount);
+
+            public void Dispose() => listener.Stop();
+
+            private async Task AcceptLoopAsync()
+            {
+                try
+                {
+                    while (true)
+                    {
+                        using TcpClient client = await listener.AcceptTcpClientAsync();
+                        System.Threading.Interlocked.Increment(ref requestCount);
+                        var stream = client.GetStream();
+                        var buffer = new byte[4096];
+                        await stream.ReadAsync(buffer, 0, buffer.Length);
+                        byte[] content = System.Text.Encoding.UTF8.GetBytes(body);
+                        byte[] head = System.Text.Encoding.ASCII.GetBytes(
+                            "HTTP/1.1 200 OK\r\nContent-Type: text/javascript; charset=utf-8\r\nContent-Length: " + content.Length + "\r\nConnection: close\r\n\r\n");
+                        await stream.WriteAsync(head, 0, head.Length);
+                        await stream.WriteAsync(content, 0, content.Length);
+                    }
+                }
+                catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException || ex is InvalidOperationException || ex is System.IO.IOException)
+                {
+                    // 停止した
+                }
+            }
         }
 
         private static Task<ReportRenderResult> Render(string body, Action<Cshtml2PdfOptions>? configure = null) =>

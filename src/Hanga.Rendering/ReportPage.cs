@@ -167,6 +167,8 @@ namespace Hanga.Rendering
             Task fallback = WaitForQuietAfterBlockedNavigationAsync();
             if (await Task.WhenAny(navigation, fallback).ConfigureAwait(false) == navigation)
             {
+                // 使わなかった代わりの待機は、帳票の処理の終わりに取り消される。その例外を観測済みにする
+                _ = fallback.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
                 await navigation.ConfigureAwait(false);
                 return;
             }
@@ -178,7 +180,9 @@ namespace Hanga.Rendering
         /// <summary>移動を止めた後に、ページの読み込みが完了し、要求が 500 ミリ秒の間無いことを待つ(ネットワークの静止と同じ基準)。</summary>
         private async Task WaitForQuietAfterBlockedNavigationAsync()
         {
-            await navigationBlocked.Task.ConfigureAwait(false);
+            // 移動を止めなかった場合は、ページの取り消し(帳票の処理の終わり)まで待つだけにする
+            await Task.WhenAny(navigationBlocked.Task, Task.Delay(Timeout.Infinite, cancellationToken)).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             var quiet = System.Diagnostics.Stopwatch.StartNew();
             while (true)
             {
@@ -216,7 +220,9 @@ namespace Hanga.Rendering
             string? detail = warning.Detail;
             if (detail != null && detail.Length > MaxWarningDetailLength)
             {
-                detail = detail.Substring(0, MaxWarningDetailLength) + "…";
+                // サロゲートペア(「𠮷」など、人名の外字に多い)の途中で切らない
+                int length = char.IsHighSurrogate(detail[MaxWarningDetailLength - 1]) ? MaxWarningDetailLength - 1 : MaxWarningDetailLength;
+                detail = detail.Substring(0, length) + "…";
                 warning = new HangaWarning(warning.Kind, warning.Message, detail);
             }
 
@@ -277,13 +283,14 @@ namespace Hanga.Rendering
         /// </summary>
         private async void OnDialog(object? sender, DialogEventArgs e)
         {
-            bool isAlert = e.Dialog.DialogType == DialogType.Alert;
-            AddWarning(new HangaWarning(
-                HangaWarningKind.Dialog,
-                $"ページの JavaScript がダイアログ({e.Dialog.DialogType})を出したため、「{(isAlert ? "OK" : "キャンセル")}」で閉じて続けました。",
-                e.Dialog.Message));
+            // async void のイベントのため、例外を外へ出さない(外へ出るとプロセスが終了する)
             try
             {
+                bool isAlert = e.Dialog.DialogType == DialogType.Alert;
+                AddWarning(new HangaWarning(
+                    HangaWarningKind.Dialog,
+                    $"ページの JavaScript がダイアログ({e.Dialog.DialogType})を出したため、「{(isAlert ? "OK" : "キャンセル")}」で閉じて続けました。",
+                    e.Dialog.Message));
                 if (isAlert)
                 {
                     await e.Dialog.Accept().ConfigureAwait(false);
@@ -305,10 +312,14 @@ namespace Hanga.Rendering
         /// </summary>
         private async void OnPopup(object? sender, PopupEventArgs e)
         {
-            AddWarning(new HangaWarning(HangaWarningKind.BlockedNavigation, "ページが別のウィンドウを開こうとしたため、閉じました。", StripQuery(e.PopupPage.Url)));
+            // async void のイベントのため、例外を外へ出さない(外へ出るとプロセスが終了する)
             try
             {
-                await e.PopupPage.CloseAsync().ConfigureAwait(false);
+                AddWarning(new HangaWarning(HangaWarningKind.BlockedNavigation, "ページが別のウィンドウを開こうとしたため、閉じました。", StripQuery(e.PopupPage?.Url ?? string.Empty)));
+                if (e.PopupPage != null)
+                {
+                    await e.PopupPage.CloseAsync().ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
