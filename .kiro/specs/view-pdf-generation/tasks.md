@@ -72,14 +72,14 @@
   - [x] 4.5 4.1〜4.4 のテスト(Chromiumを使う): 起動・版の取得、プロセスを止めた後の再起動、枠を超えた要求が待たされること、取り消し、コンテキスト間で localStorage が共有されないこと
     - _Requirements: 9.2, 9.4〜9.6_
 
-- [ ] 5. Rendering: ページの表示と要求の振り分け
+- [x] 5. Rendering: ページの表示と要求の振り分け
   - [x] 5.1 `IVirtualOriginHandler`(仮想オリジンへの要求を受け取って応答を返すインターフェース)と、その要求・応答の型を定義する(PuppeteerSharp・ASP.NET Core の型を含めない)
     - _Requirements: 2.6, 3.1_
   - [x] 5.2 `ReportPage`: 要求への介入を有効にし、ページ内のJavaScript(`location.href`)で仮想オリジンへ移動し、`/__hanga/report` に帳票のHTMLを返す
     - _Requirements: 2.3, 2.4_
   - [x] 5.3 要求の振り分け(1): `/__hanga/` のリソース(埋め込みリソース)、`favicon.ico`(204)、その他の仮想オリジンへの要求を `IVirtualOriginHandler` へ渡す
     - _Requirements: 3.1, 3.7_
-  - [ ] 5.4 要求の振り分け(2): 仮想オリジンへの要求の失敗(400以上・300番台)の記録と、表示の後のエラー化(`HangaResourceRequestException`)
+  - [x] 5.4 要求の振り分け(2): 仮想オリジンへの要求の失敗(400以上・300番台)の記録と、表示の後のエラー化(`HangaResourceRequestException`)
     - _Requirements: 3.5, 8.4_
     - 注記: 失敗の記録は `ReportPage` で行う(タスク5で実装済み)。エラー化は、描画全体を組み立てる `ReportRenderer`(タスク6.3と同時)で行う。
   - [x] 5.5 要求の振り分け(3): 許可した外部ホストは通し、それ以外は遮断して警告 `BlockedExternalRequest`(厳格ならエラー)
@@ -87,16 +87,16 @@
   - [x] 5.6 5.1〜5.5 のテスト(Chromiumを使う。`IVirtualOriginHandler` はテスト用の実装を使う)
     - _Requirements: 2.3, 2.4, 3.1, 3.4〜3.7_
 
-- [ ] 6. Rendering: 表示の完了の待機
-  - [ ] 6.1 ネットワークの静止(`Networkidle0`)と `document.fonts.ready` を待つ
+- [x] 6. Rendering: 表示の完了の待機
+  - [x] 6.1 ネットワークの静止(`Networkidle0`)と `document.fonts.ready` を待つ
     - _Requirements: 4.1_
-  - [ ] 6.2 完了条件の式(`ReadyExpression`)を待つ
+  - [x] 6.2 完了条件の式(`ReadyExpression`)を待つ
     - _Requirements: 4.2_
-  - [ ] 6.3 全体の上限時間と、超えた場合の `HangaTimeoutException`(待っていた条件と、未完了の要求のURL付き)
+  - [x] 6.3 全体の上限時間と、超えた場合の `HangaTimeoutException`(待っていた条件と、未完了の要求のURL付き)
     - _Requirements: 4.3, 4.4_
-  - [ ] 6.4 ページの `PageError` を警告 `ScriptError` にする(厳格ならエラー)
+  - [x] 6.4 ページの `PageError` を警告 `ScriptError` にする(厳格ならエラー)
     - _Requirements: 4.5_
-  - [ ] 6.5 6.1〜6.4 のテスト(Chromiumを使う): 遅れて描画するJavaScript、完了条件の式、上限時間の超過、スクリプトの例外
+  - [x] 6.5 6.1〜6.4 のテスト(Chromiumを使う): 遅れて描画するJavaScript、完了条件の式、上限時間の超過、スクリプトの例外
     - _Requirements: 4.1〜4.5_
 
 - [ ] 7. Rendering: 体裁とPDF化

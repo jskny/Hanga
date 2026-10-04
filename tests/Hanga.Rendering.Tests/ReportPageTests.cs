@@ -161,7 +161,7 @@ namespace Hanga.Rendering.Tests
             var setup = new ReportPageSetup(Origin, html, handler);
             configure?.Invoke(setup);
             var page = await ReportPage.CreateAsync(lease, setup, NullLogger.Instance, default);
-            await page.NavigateAsync(TimeSpan.FromSeconds(20));
+            await page.NavigateAsync();
             await assert(page);
         }
     }

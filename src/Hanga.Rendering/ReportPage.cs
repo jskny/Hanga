@@ -102,13 +102,14 @@ namespace Hanga.Rendering
         /// <summary>
         /// 空白のページから、ページ内の JavaScript で仮想オリジンの帳票の URL へ移動し、ネットワークが静止するまで待つ(要件2.4, 4.1)。
         /// <c>Page.navigate</c>(<c>GoToAsync</c>)は使わない(PuppeteerSharp 18.1.0 は新しい Chrome で失敗する。要件2.3)。
+        /// 上限時間は呼び出し側(<see cref="ReportRenderer"/>)が帳票全体の締め切りとして管理するため、ここでは時間を区切らない。
         /// </summary>
-        public async Task NavigateAsync(TimeSpan timeout)
+        public async Task NavigateAsync()
         {
             var navigation = Page.WaitForNavigationAsync(new NavigationOptions
             {
                 WaitUntil = new[] { WaitUntilNavigation.Networkidle0 },
-                Timeout = (int)Math.Min(int.MaxValue, timeout.TotalMilliseconds),
+                Timeout = 0,
             });
 
             // 移動は評価の後に行わせる(評価中に移動すると、評価の結果を受け取る前に実行コンテキストが破棄されるため)
