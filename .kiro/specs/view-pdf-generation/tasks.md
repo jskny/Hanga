@@ -48,16 +48,16 @@
     - _Requirements: 4.3, 5, 8.7_
   - [x] 2.6 2.1〜2.5 のユニットテスト
 
-- [ ] 3. Templating: ビューのHTML化
-  - [ ] 3.1 `ViewHtmlRenderer`: `ActionContext` を作り、`IRazorViewEngine.FindView` でビューを探し、`StringWriter` に描画する基本の処理
+- [x] 3. Templating: ビューのHTML化
+  - [x] 3.1 `ViewHtmlRenderer`: `ActionContext` を作り、`IRazorViewEngine.FindView` でビューを探し、`StringWriter` に描画する基本の処理
     - _Requirements: 1.1, 1.2_
-  - [ ] 3.2 コントローラー名の既定(元の要求のコントローラー)と明示指定、コントローラーの `ViewData`(`ViewBag`)の引き継ぎ
+  - [x] 3.2 コントローラー名の既定(元の要求のコントローラー)と明示指定、コントローラーの `ViewData`(`ViewBag`)の引き継ぎ
     - _Requirements: 1.3_
-  - [ ] 3.3 ビューが見つからない場合(探した場所の一覧付き)と、描画中の例外の包み込み
+  - [x] 3.3 ビューが見つからない場合(探した場所の一覧付き)と、描画中の例外の包み込み
     - _Requirements: 1.4, 1.5_
-  - [ ] 3.4 ビューのHTML化に必要な情報(`HttpContext`・ルーティング情報)を、引数として受け取る形にしておく(元の要求が無い場合の作り方はバッチの版で実装する)
+  - [x] 3.4 ビューのHTML化に必要な情報(`HttpContext`・ルーティング情報)を、引数として受け取る形にしておく(元の要求が無い場合の作り方はバッチの版で実装する)
     - _Requirements: 1.6_
-  - [ ] 3.5 `Hanga.TestApp` を使ったテスト: レイアウト・`ViewData`・セクション・部分ビュー・`~/`・`asp-append-version`・`asp-controller`/`asp-action` が画面と同じHTMLになること、見つからない場合・例外の場合
+  - [x] 3.5 `Hanga.TestApp` を使ったテスト: レイアウト・`ViewData`・セクション・部分ビュー・`~/`・`asp-append-version`・`asp-controller`/`asp-action` が画面と同じHTMLになること、見つからない場合・例外の場合
     - _Requirements: 1.1〜1.5_
 
 - [ ] 4. Rendering: Chromium の管理

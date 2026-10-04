@@ -6,6 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="5.0.17" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hanga.TestApp\Hanga.TestApp.csproj" />
     <ProjectReference Include="..\..\src\Hanga.Templating\Hanga.Templating.csproj" />
     <ProjectReference Include="..\Hanga.TestSupport\Hanga.TestSupport.csproj" />
   </ItemGroup>

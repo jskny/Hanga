@@ -14,6 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- このプロジェクトの型は呼び出し元に見せず、ファサード(Hanga)だけが使う(要件2.6) -->
+    <InternalsVisibleTo Include="Hanga" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Hanga.Core\Hanga.Core.csproj" />
   </ItemGroup>
 
