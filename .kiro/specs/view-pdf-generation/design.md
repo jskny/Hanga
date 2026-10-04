@@ -242,9 +242,13 @@ IISのリバースプロキシの背後で `UseHttpsRedirection` を使ってい
    | B4 / B5 | 257×364 / 182×257(日本の業務で使うJIS B列) |
    | Letter / Legal | 215.9×279.4 / 215.9×355.6 |
 
-3. 倍率を決める(要件5.3, 5.4): `FitToPageWidth` なら、`document.documentElement.scrollWidth`(CSSピクセル)と印刷可能な幅
-   (`(用紙の幅 − 左右の余白)mm ÷ 25.4 × 96`)から `min(1, 印刷可能な幅 ÷ 内容の幅)` を求め、`Scale` に掛ける。0.1〜2.0 に丸める。
-4. `SinglePage` なら、ページの高さを `内容の高さ × 倍率 ÷ 96 × 25.4 + 上下の余白 + 1`(mm)にする(要件5.5)。
+3. 倍率を決める(要件5.3, 5.4): 画面(ビューポート)の幅を印刷可能な幅(`(用紙の幅 − 左右の余白)mm ÷ 25.4 × 96` CSSピクセル)にしてから、
+   内容の幅(`scrollWidth`)を測る。`FitToPageWidth` なら、`内容の幅 × Scale` が印刷可能な幅を超えるときだけ `印刷可能な幅 ÷ 内容の幅` に縮小する
+   (収まるときは `Scale` のまま)。0.1〜2.0 に丸める。
+   - 画面の幅を合わせてから測るのは、`width: 100%` のように用紙の幅に合わせて伸び縮みする画面を、不要に縮小しないため
+     (PuppeteerSharp の既定の画面の幅 800px のまま測ると、印刷可能な幅 718px を超えるとみなしてしまう)。実装時に追加した(タスク7)。
+4. `SinglePage` なら、画面の幅を `印刷可能な幅 ÷ 倍率`(縮小して印刷したときに内容が組まれる幅)にして内容の高さを測り、
+   ページの高さを `内容の高さ × 倍率 ÷ 96 × 25.4 + 上下の余白 + 1`(mm)にする(要件5.5)。上限は `PaperSize.MaxMillimeters`(5000mm)で、超えた分は次のページに送られる。
 5. `PageNumbers` なら、`DisplayHeaderFooter = true`、フッターに `<span class="pageNumber"></span> / <span class="totalPages"></span>` を指定し、ヘッダーは空にする(要件5.8)。
 6. `Title` が指定されていれば `document.title` を書き換える(Chromiumは `document.title` を文書のタイトルにする。要件5.9)。
 7. `PdfDataAsync`(幅・高さはmmの文字列、`PrintBackground`、`MarginOptions`、`Scale`)。
