@@ -80,45 +80,99 @@ namespace Hanga.Rendering
             TimeSpan timeout = options.EffectiveTimeout(global);
             bool strict = options.EffectiveStrict(global);
             var stopwatch = Stopwatch.StartNew();
-
-            await using RenderLease lease = await host.AcquireAsync(cancellationToken).ConfigureAwait(false);
-            var deadline = new Deadline(timeout, cancellationToken);
-
-            var setup = new ReportPageSetup(global.NormalizedVirtualOrigin, input.Html, input.Handler)
+            HangaStage stage = HangaStage.BrowserLaunch;
+            try
             {
-                AllowedExternalHosts = global.AllowedExternalHosts,
-                MaxResponseBodyBytes = global.MaxResponseBodyBytes,
-                Resources = glyphs.Resources,
-            };
-            ReportPage page = await ReportPage.CreateAsync(lease, setup, logger, cancellationToken).ConfigureAwait(false);
+                await using RenderLease lease = await host.AcquireAsync(cancellationToken).ConfigureAwait(false);
 
-            await WaitForReadyAsync(page, options, deadline).ConfigureAwait(false);
+                // 帳票ごとの取り消し。元の取り消しとつなぎ、帳票の処理が終わったら(正常・失敗とも)取り消す。
+                // 時間切れの後も、アプリへの転送(オペレーターの権限での API の処理)が続かないようにするため(要件9.6)
+                using var reportCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                try
+                {
+                    var deadline = new Deadline(timeout, cancellationToken);
+                    var setup = new ReportPageSetup(global.NormalizedVirtualOrigin, input.Html, input.Handler)
+                    {
+                        AllowedExternalHosts = global.AllowedExternalHosts,
+                        MaxResponseBodyBytes = global.MaxResponseBodyBytes,
+                        MaxTotalResponseBytes = global.MaxTotalResponseBytesPerReport,
+                        Resources = glyphs.Resources,
+                    };
 
+                    stage = HangaStage.PageLoad;
+                    ReportPage page = await ReportPage.CreateAsync(lease, setup, logger, reportCts.Token).ConfigureAwait(false);
+                    await WaitForReadyAsync(page, options, deadline).ConfigureAwait(false);
+                    ThrowIfFailed(page);
+
+                    // 外字・異体字・字形の無い文字(要件6)。API から取得した値が描画された後に行う
+                    await deadline.RunAsync(glyphs.ApplyAsync(page.Page), "外字用フォントの適用", page).ConfigureAwait(false);
+                    HangaWarning? missingGlyphs = await deadline.RunAsync(glyphs.FindMissingGlyphsAsync(page.Page), "字形の確認", page).ConfigureAwait(false);
+                    if (missingGlyphs != null)
+                    {
+                        page.AddWarning(missingGlyphs);
+                    }
+
+                    // 出力の直前に、待機の後に始まった要求も終わったこと・失敗していないことを確かめる(要件8.4)
+                    await deadline.RunAsync(WaitForNoPendingRequestsAsync(page), "未完了の要求の完了", page).ConfigureAwait(false);
+                    ThrowIfFailed(page);
+                    ThrowIfStrict(page.Warnings, strict);
+
+                    stage = HangaStage.PdfOutput;
+                    byte[] pdf = await deadline.RunAsync(PdfPrinter.PrintAsync(page.Page, options), "PDF の出力", page).ConfigureAwait(false);
+
+                    var warnings = page.Warnings;
+                    if (warnings.Count > 0)
+                    {
+                        // 詳細(字形の無い文字・スクリプトの例外の内容)は氏名などを含みうるため、通常のログには種類と件数だけを出す(要件8.5)
+                        logger.LogWarning("帳票の生成で問題が見つかりました: {Summary}", string.Join("、", warnings.GroupBy(w => w.Kind).Select(g => $"{g.Key} {g.Count()}件")));
+                        foreach (var warning in warnings)
+                        {
+                            logger.LogDebug("帳票の生成で見つかった問題の詳細: {Warning}", warning.ToString());
+                        }
+                    }
+
+                    return new ReportRenderResult(pdf, warnings, lease.BrowserVersion, stopwatch.Elapsed);
+                }
+                finally
+                {
+                    reportCts.Cancel();
+                }
+            }
+            catch (Exception ex) when (!(ex is HangaException) && !(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
+            {
+                // Chromium(PuppeteerSharp)の想定外の失敗は、段階と Chromium の場所・版を付けて Hanga の例外にする(要件8.1〜8.3)
+                throw new HangaBrowserException(StageMessage(stage), global.ChromiumExecutablePath, host.BrowserVersion, stage, ex);
+            }
+        }
+
+        private static string StageMessage(HangaStage stage)
+        {
+            switch (stage)
+            {
+                case HangaStage.BrowserLaunch: return "Chromium を使う準備に失敗しました。";
+                case HangaStage.PdfOutput: return "PDF の出力中に Chromium でエラーが発生しました。";
+                default: return "ページの表示中に Chromium でエラーが発生しました。";
+            }
+        }
+
+        private static void ThrowIfFailed(ReportPage page)
+        {
             if (page.FailedRequests.Count > 0)
             {
                 // 必要な値が欠けた PDF を返さないため、設定によらずエラーにする(要件3.5, 8.4)
                 throw new HangaResourceRequestException(page.FailedRequests);
             }
+        }
 
-            // 外字・異体字・字形の無い文字(要件6)。API から取得した値が描画された後に行う
-            await deadline.RunAsync(glyphs.ApplyAsync(page.Page), "外字用フォントの適用", page).ConfigureAwait(false);
-            HangaWarning? missingGlyphs = await deadline.RunAsync(glyphs.FindMissingGlyphsAsync(page.Page), "字形の確認", page).ConfigureAwait(false);
-            if (missingGlyphs != null)
+        /// <summary>完了していない要求が無くなるまで待つ(上限は呼び出し側の締め切り)。</summary>
+        private static async Task<bool> WaitForNoPendingRequestsAsync(ReportPage page)
+        {
+            while (page.PendingRequestUrls.Count > 0)
             {
-                page.AddWarning(missingGlyphs);
+                await Task.Delay(50).ConfigureAwait(false);
             }
 
-            ThrowIfStrict(page.Warnings, strict);
-
-            byte[] pdf = await deadline.RunAsync(PdfPrinter.PrintAsync(page.Page, options), "PDF の出力", page).ConfigureAwait(false);
-
-            var warnings = page.Warnings;
-            foreach (var warning in warnings)
-            {
-                logger.LogWarning("帳票の生成で問題が見つかりました: {Warning}", warning.ToString());
-            }
-
-            return new ReportRenderResult(pdf, warnings, lease.BrowserVersion, stopwatch.Elapsed);
+            return true;
         }
 
         /// <summary>
@@ -130,7 +184,7 @@ namespace Hanga.Rendering
 
             if (!string.IsNullOrWhiteSpace(options.ReadyExpression))
             {
-                // 式は呼び出し元(アプリの開発者)が書いたもの。ページの内容(利用者の入力)は埋め込まない
+                // 式は呼び出し元(アプリの開発者)が書いたもの。利用者の入力を含めないこと(Cshtml2PdfOptions.ReadyExpression の説明)
                 string function = "() => !!(" + options.ReadyExpression + ")";
                 await deadline.RunAsync(
                     page.Page.WaitForFunctionAsync(function, new WaitForFunctionOptions { Timeout = 0, PollingInterval = 100 }),

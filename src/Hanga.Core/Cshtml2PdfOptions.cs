@@ -41,7 +41,10 @@ namespace Hanga
         /// <summary>PDF の文書のタイトル。未指定ならページの <c>&lt;title&gt;</c>(要件5.9)。</summary>
         public string? Title { get; set; }
 
-        /// <summary>表示の完了の条件として追加で待つ JavaScript の式(例: <c>window.reportReady === true</c>)。要件4.2。</summary>
+        /// <summary>
+        /// 表示の完了の条件として追加で待つ JavaScript の式(例: <c>window.reportReady === true</c>)。要件4.2。
+        /// 式はページの中でオペレーターの権限で実行されるため、アプリの開発者が書いた固定の式だけを指定し、利用者の入力を含めないこと。
+        /// </summary>
         public string? ReadyExpression { get; set; }
 
         /// <summary>表示の完了を待つ上限時間。未指定ならアプリ全体の設定(要件4.3)。</summary>

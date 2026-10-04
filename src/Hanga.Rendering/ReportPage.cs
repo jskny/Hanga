@@ -37,6 +37,9 @@ namespace Hanga.Rendering
 
         /// <summary>仮想オリジンへの要求 1 件の応答の大きさの上限(バイト)。</summary>
         public long MaxResponseBodyBytes { get; set; } = long.MaxValue;
+
+        /// <summary>帳票 1 件の、仮想オリジンへの要求の応答の合計の上限(バイト)。</summary>
+        public long MaxTotalResponseBytes { get; set; } = long.MaxValue;
     }
 
     /// <summary>
@@ -67,6 +70,10 @@ namespace Hanga.Rendering
         private readonly ConcurrentQueue<HangaWarning> warnings = new ConcurrentQueue<HangaWarning>();
         private readonly ConcurrentDictionary<IRequest, string> pendingRequests = new ConcurrentDictionary<IRequest, string>();
 
+        /// <summary>許可した外部ホストへ通した要求(失敗を記録するため)。</summary>
+        private readonly ConcurrentDictionary<IRequest, bool> continuedExternalRequests = new ConcurrentDictionary<IRequest, bool>();
+        private long totalResponseBytes;
+
         private ReportPage(IPage page, ReportPageSetup setup, ILogger logger, CancellationToken cancellationToken)
         {
             Page = page;
@@ -93,8 +100,9 @@ namespace Hanga.Rendering
             var reportPage = new ReportPage(page, setup, logger, cancellationToken);
             await page.SetRequestInterceptionAsync(true).ConfigureAwait(false);
             page.Request += reportPage.OnRequest;
-            page.RequestFinished += (s, e) => reportPage.pendingRequests.TryRemove(e.Request, out _);
-            page.RequestFailed += (s, e) => reportPage.pendingRequests.TryRemove(e.Request, out _);
+            page.RequestFinished += (s, e) => reportPage.OnExternalFinished(e.Request, failed: false);
+            page.RequestFailed += (s, e) => reportPage.OnExternalFinished(e.Request, failed: true);
+            page.Response += (s, e) => reportPage.OnExternalResponse(e.Response);
             page.PageError += (s, e) => reportPage.AddWarning(new HangaWarning(HangaWarningKind.ScriptError, "ページの JavaScript で例外が発生しました。", e.Message));
             return reportPage;
         }
@@ -114,14 +122,63 @@ namespace Hanga.Rendering
 
             // 移動は評価の後に行わせる(評価中に移動すると、評価の結果を受け取る前に実行コンテキストが破棄されるため)
             string url = setup.VirtualOrigin + ReportPath;
-            await Page.EvaluateExpressionAsync($"setTimeout(function () {{ location.href = {JsString(url)}; }}, 0)").ConfigureAwait(false);
+            try
+            {
+                await Page.EvaluateExpressionAsync($"setTimeout(function () {{ location.href = {JsString(url)}; }}, 0)").ConfigureAwait(false);
+            }
+            catch
+            {
+                // 移動の待機を放置しない(ページを閉じると失敗するため、例外を観測済みにする)
+                _ = navigation.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+                throw;
+            }
+
             await navigation.ConfigureAwait(false);
         }
 
         internal void AddWarning(HangaWarning warning) => warnings.Enqueue(warning);
 
         /// <summary>JavaScript の文字列リテラルにする(ページの内容を式に埋め込まないため、URL など Hanga 自身の値だけに使う)。</summary>
-        internal static string JsString(string value) => "'" + value.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
+        internal static string JsString(string value)
+        {
+            var builder = new StringBuilder("'");
+            foreach (char c in value)
+            {
+                switch (c)
+                {
+                    case '\\': builder.Append("\\\\"); break;
+                    case '\'': builder.Append("\\'"); break;
+                    case '\n': builder.Append("\\n"); break;
+                    case '\r': builder.Append("\\r"); break;
+                    case '\u2028': builder.Append("\\u2028"); break;
+                    case '\u2029': builder.Append("\\u2029"); break;
+                    case '<': builder.Append("\\u003C"); break;
+                    default: builder.Append(c); break;
+                }
+            }
+
+            return builder.Append('\'').ToString();
+        }
+
+        /// <summary>許可した外部ホストへ通した要求が失敗した(名前解決の失敗など)。失敗として記録する(要件3.5)。</summary>
+        private void OnExternalFinished(IRequest request, bool failed)
+        {
+            pendingRequests.TryRemove(request, out _);
+            if (continuedExternalRequests.TryRemove(request, out _) && failed)
+            {
+                failedRequests.Enqueue(new FailedRequest(Method(request), StripQuery(request.Url), 0));
+            }
+        }
+
+        /// <summary>許可した外部ホストからの応答が失敗(400 以上)だった。失敗として記録する(要件3.5)。</summary>
+        private void OnExternalResponse(IResponse response)
+        {
+            if (response.Request != null && continuedExternalRequests.ContainsKey(response.Request) && (int)response.Status >= 400)
+            {
+                continuedExternalRequests.TryRemove(response.Request, out _);
+                failedRequests.Enqueue(new FailedRequest(Method(response.Request), StripQuery(response.Request.Url), (int)response.Status));
+            }
+        }
 
         private async void OnRequest(object? sender, RequestEventArgs e)
         {
@@ -155,10 +212,18 @@ namespace Hanga.Rendering
                 return;
             }
 
+            if (uri.Scheme == "data" || uri.Scheme == "blob")
+            {
+                // ページの中で完結するデータ(インラインの画像など)。外部への通信ではないため通す
+                await request.ContinueAsync().ConfigureAwait(false);
+                return;
+            }
+
             if (!IsVirtualOrigin(uri))
             {
                 if (IsAllowedExternalHost(uri))
                 {
+                    continuedExternalRequests[request] = true;
                     await request.ContinueAsync().ConfigureAwait(false);
                 }
                 else
@@ -205,7 +270,8 @@ namespace Hanga.Rendering
                 new Dictionary<string, string>(request.Headers ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase),
                 request.PostData == null ? null : Encoding.UTF8.GetBytes(request.PostData.ToString() ?? string.Empty));
             VirtualResponse response = await setup.Handler.HandleAsync(virtualRequest, cancellationToken).ConfigureAwait(false);
-            if (response.Body.LongLength > setup.MaxResponseBodyBytes)
+            long total = Interlocked.Add(ref totalResponseBytes, response.Body.LongLength);
+            if (response.Body.LongLength > setup.MaxResponseBodyBytes || total > setup.MaxTotalResponseBytes)
             {
                 failedRequests.Enqueue(new FailedRequest(virtualRequest.Method, StripQuery(request.Url), response.StatusCode));
                 await RespondAsync(request, 502, null, Array.Empty<byte>(), null).ConfigureAwait(false);

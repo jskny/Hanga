@@ -81,7 +81,8 @@ services.AddHanga(Configuration.GetSection("Hanga"), options => { ... }); // 設
 
 - `HangaPdfConverter`(シングルトン。共有の変換器)
 - `IStartupFilter`(パイプラインの捕捉。`Startup.Configure` の変更は不要)
-- `IHostedService`(アプリの停止時にChromiumを終了する。`options.LaunchOnStartup = true` なら起動時にChromiumを起動する。要件10.2)
+- `IHostedService`(`options.LaunchOnStartup = true` なら起動時にChromiumを起動する。要件10.2)。Chromiumの終了は、Webサーバーが処理中の要求を終えた後
+  (`IHostApplicationLifetime.ApplicationStopped`)に行う。常駐サービスの停止はWebサーバーの停止より先に呼ばれるため、そこで終了すると処理中のPDFの要求が失敗する(コードレビューの指摘で修正)
 
 ### PDF用アクション
 
@@ -121,6 +122,7 @@ public async Task<IActionResult> OrderPdf(int id)
 | `GaijiFontFamily` / `GaijiFontFile` | 未指定 | 外字用フォント(名前 または ファイル。要件6.1) |
 | `DetectMissingGlyphs` | `true` | 字形の無い文字を検出する(要件6.7) |
 | `Strict` | `false` | 警告の対象をエラーにする(要件8.7) |
+| `MaxTotalResponseBytesPerReport` | 200MB | 帳票1件の、仮想オリジンへの要求の応答の合計の上限(大きなファイルを多数読み込むページでメモリを使い尽くさないための安全弁) |
 | `MaxResponseBodyBytes` | 50MB | 仮想オリジンへの要求1件の応答の大きさの上限(メモリを使い尽くさないための安全弁。下記「⑤⑥」) |
 | `VirtualOrigin` | `https://hanga.invalid` | 仮想オリジン(`.invalid` はRFC 6761で実在しないことが保証されたドメイン) |
 
@@ -349,6 +351,24 @@ HangaException(基底。Stage: 失敗した段階)
 
 1件の時間の多くは、通信が止んでから 500 ミリ秒待つ「ネットワークの静止」の待ち時間である(上記「同時に処理する帳票の数」)。
 
+### レビューを受けて加えた設計(2026年10月4日)
+
+`code-reviewer`・`security-reviewer` の指摘を受けて、次を加えた。
+
+- **想定外の失敗の包み込み**: ページの表示・PDFの出力の中で PuppeteerSharp が投げた例外(Chromium が描画中に落ちた、`ReadyExpression` の書き間違い等)は、
+  失敗した段階と Chromium の場所・版を付けて `HangaBrowserException` にする(要件8.1〜8.3)。
+- **帳票ごとの取り消し**: 帳票ごとに、元の取り消しとつないだ取り消しを作り、帳票の処理が終わったら(正常・失敗とも)取り消す。
+  時間切れの後も、アプリへの転送(オペレーターの権限での API の処理)が続かないようにするため(要件9.6)。
+- **出力の直前の確認**: PDF の出力の直前に、完了していない要求が無くなるのを待ち、失敗した要求が無いことを確かめ直す(待機の後に始まった要求を見逃さないため。要件8.4)。
+- **許可した外部ホストへの要求の失敗**: 状態コード400以上・名前解決の失敗などを、仮想オリジンへの要求と同じく失敗として扱う(要件3.5 に追記)。
+- **`data:`・`blob:` の URL**: ページの中で完結するデータのため、遮断せずに通す。
+- **応答の合計の上限**: `MaxTotalResponseBytesPerReport`(既定200MB)を超えた応答は失敗として扱う。
+- **入れ子の検出**: 転送した要求の `HttpContext.Items` に印を付け、その中で `Cshtml2Pdf` を作ろうとした場合はすぐに `HangaConfigurationException` にする
+  (帳票のビューが PDF 用アクションを iframe 等で読み込むと、同時実行の枠を食い合うため)。
+- **ログ**: 警告は、通常のログ(Warning)には種類と件数だけを出し、詳細(字形の無い文字・スクリプトの例外の内容。氏名などを含みうる)は Debug に出す(要件8.5)。
+- **Chromium の起動し直し**: ブラウザコンテキストを作れなかった場合は、プロセスの終了の通知が届いていなくても、その Chromium を破棄して 1 回だけ起動し直す(要件9.5)。
+- **一時ユーザーデータフォルダ**: 起動時に、異常終了などで残った 1 日以上前のフォルダを削除する。
+
 ## 未検証の事項(実装時・Windows Server の検証環境で確認する)
 
 - 判定用フォント(cmap format 13 のみ)を、Windows の Chromium が読み込めるか。読み込めない場合は、format 12 で全符号位置を連続した字形に割り当てる形に作り直す(ファイルは大きくなる)。
@@ -356,6 +376,10 @@ HangaException(基底。Stage: 失敗した段階)
 - IISの配下(アプリケーションプールのユーザー)でのChromiumの起動。
 - 画面のAPIが POST と Antiforgery のトークンを使う場合の動作。
 - Chromiumを使い回し、多数の同時要求を受けた場合の安定性。
+- (セキュリティレビューの提案、未対応)Chromium の起動引数の既定に `--host-resolver-rules`(許可したホスト以外を名前解決させない)を加える多重の防御。
+  WebSocket・Service Worker など、ページの要求への介入を通らない通信を止めるため。起動引数の既定を変えると利用部門の環境での影響を確かめる必要があるため、今回は見送った。
+  必要であれば `ChromiumArguments` で指定できる。
+- PuppeteerSharp 18.1.0 は要求の本文を文字列で渡すため、バイナリの本文(ファイルのアップロードなど)を送る POST は正しく転送できない。帳票の表示時に行う API の呼び出しでは想定していない。
 
 ## 決めてほしいこと
 

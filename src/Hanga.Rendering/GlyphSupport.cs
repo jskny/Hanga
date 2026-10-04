@@ -54,10 +54,13 @@ namespace Hanga.Rendering
             }
 
             // 全要素のフォント指定の末尾に外字用フォントを足す(本文フォントに字形が無い文字だけが外字用フォントで描かれる。要件6.2)
-            for (const el of document.querySelectorAll('*')) {
-                const family = getComputedStyle(el).fontFamily;
+            // 書き込むたびにスタイルの再計算が起きないよう、先にすべて読んでからまとめて書き込む
+            const elements = Array.from(document.querySelectorAll('*'));
+            const families = elements.map(el => getComputedStyle(el).fontFamily);
+            elements.forEach((el, i) => {
+                const family = families[i];
                 if (family && family.indexOf('HangaGaiji') < 0) el.style.setProperty('font-family', family + "", 'HangaGaiji'"", 'important');
-            }
+            });
             await document.fonts.ready;
             return true;
         }";
@@ -182,7 +185,14 @@ namespace Hanga.Rendering
             }
             finally
             {
-                await context.CloseAsync().ConfigureAwait(false);
+                try
+                {
+                    await context.CloseAsync().ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // 後片付けの失敗で、確認の結果(設定の誤り)の例外を隠さない
+                }
             }
         }
 

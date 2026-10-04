@@ -20,8 +20,11 @@ namespace Hanga.Hosting
         /// <summary>Chromium が付けた値を使わず、元の要求の値を使うヘッダー。</summary>
         private static readonly HashSet<string> ReplacedRequestHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "Cookie", "Host", "Accept-Language", "Connection", "Keep-Alive", "Transfer-Encoding", "Upgrade",
+            "Cookie", "Host", "Accept-Language", "Connection", "Keep-Alive", "Transfer-Encoding", "Upgrade", "Content-Length",
         };
+
+        /// <summary>Hanga が転送した要求の印(<see cref="HttpContext.Items"/> のキー)。転送した要求の中で PDF を生成しようとした場合に気づくため。</summary>
+        internal static readonly object ForwardedRequestMarker = new object();
 
         private readonly RequestSnapshot snapshot;
         private readonly RequestDelegate pipeline;
@@ -71,6 +74,7 @@ namespace Hanga.Hosting
             }
 
             context.Connection.RemoteIpAddress = snapshot.RemoteIpAddress;
+            context.Items[ForwardedRequestMarker] = true;
             context.RequestAborted = cancellationToken;
 
             var body = new BoundedMemoryStream(maxResponseBodyBytes);

@@ -79,6 +79,19 @@ namespace Hanga.Tests
         }
 
         [Fact]
+        public void Hangaが転送した要求の中でPDFを生成しようとするとエラー()
+        {
+            // 帳票のビューが PDF 用アクションを読み込む(iframe など)と、入れ子で生成して同時実行の枠を食い合うため
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddHanga(o => o.ChromiumExecutablePath = "/usr/bin/chrome");
+            var context = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
+            context.Items[PipelineForwarder.ForwardedRequestMarker] = true;
+            var ex = Assert.Throws<HangaConfigurationException>(() => new Cshtml2Pdf(context, "Home", "Index"));
+            Assert.Contains("転送した要求", ex.Message);
+        }
+
+        [Fact]
         public void 登録していなければCshtml2Pdfの作成時にエラー()
         {
             var context = new DefaultHttpContext { RequestServices = new ServiceCollection().BuildServiceProvider() };

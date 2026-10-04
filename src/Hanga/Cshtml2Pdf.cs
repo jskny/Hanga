@@ -62,6 +62,12 @@ namespace Hanga
             this.viewName = string.IsNullOrWhiteSpace(viewName) ? throw new ArgumentException("ビュー名を指定してください。", nameof(viewName)) : viewName;
             this.model = model;
             this.viewData = viewData;
+            if (httpContext.Items.ContainsKey(PipelineForwarder.ForwardedRequestMarker))
+            {
+                // 帳票のページが PDF 用アクションを読み込んでいる(iframe など)。入れ子で生成すると同時実行の枠を食い合うため、すぐにエラーにする
+                throw new HangaConfigurationException("Hanga が帳票の表示のために転送した要求の中で、PDF を生成しようとしました。帳票のビューから PDF 用アクションを読み込まないでください。");
+            }
+
             converter = httpContext.RequestServices?.GetService<HangaPdfConverter>()
                 ?? throw new HangaConfigurationException("Hanga が登録されていません。Startup.ConfigureServices で services.AddHanga(...) を呼んでください。");
 

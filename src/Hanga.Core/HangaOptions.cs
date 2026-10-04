@@ -50,6 +50,12 @@ namespace Hanga
         /// <summary>仮想オリジンへの要求 1 件の応答の大きさの上限(バイト)。既定は 50MB。</summary>
         public long MaxResponseBodyBytes { get; set; } = 50L * 1024 * 1024;
 
+        /// <summary>
+        /// 帳票 1 件で、仮想オリジンへの要求の応答の合計の上限(バイト)。既定は 200MB。
+        /// 1 件ごとの上限(<see cref="MaxResponseBodyBytes"/>)だけでは、大きなファイルを多数読み込むページでメモリを使い尽くしうるため。
+        /// </summary>
+        public long MaxTotalResponseBytesPerReport { get; set; } = 200L * 1024 * 1024;
+
         /// <summary>値を検証する。誤りがあれば、すべての誤りを含めて <see cref="HangaConfigurationException"/> を投げる。</summary>
         public void Validate()
         {
@@ -72,6 +78,11 @@ namespace Hanga
             if (MaxResponseBodyBytes < 1)
             {
                 errors.Add($"MaxResponseBodyBytes は 1 以上で指定してください(指定: {MaxResponseBodyBytes})。");
+            }
+
+            if (MaxTotalResponseBytesPerReport < 1)
+            {
+                errors.Add($"MaxTotalResponseBytesPerReport は 1 以上で指定してください(指定: {MaxTotalResponseBytesPerReport})。");
             }
 
             if (!string.IsNullOrWhiteSpace(GaijiFontFamily) && !string.IsNullOrWhiteSpace(GaijiFontFile))

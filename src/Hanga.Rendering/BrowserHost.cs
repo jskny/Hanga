@@ -16,7 +16,7 @@ namespace Hanga.Rendering
     /// <item>同時に処理する帳票の数を制限し(要件9.4)、帳票 1 件ごとに独立したブラウザコンテキストを作る(要件9.2)。</item>
     /// </list>
     /// </summary>
-    internal sealed class BrowserHost : IAsyncDisposable
+    internal sealed class BrowserHost : IAsyncDisposable, IDisposable
     {
         private readonly HangaOptions options;
         private readonly ILogger logger;
@@ -73,6 +73,9 @@ namespace Hanga.Rendering
             }
         }
 
+        /// <summary>同期の破棄(依存性注入のコンテナが同期で破棄される場合に備える)。</summary>
+        public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
+
         public async ValueTask DisposeAsync()
         {
             if (disposed)
@@ -99,10 +102,12 @@ namespace Hanga.Rendering
             {
                 return await current.CreateBrowserContextAsync().ConfigureAwait(false);
             }
-            catch (Exception ex) when (!current.IsConnected && !(ex is OperationCanceledException))
+            catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is HangaException))
             {
-                // コンテキストを作る間にプロセスが終了した。次の GetBrowserAsync で 1 回だけ起動し直す(要件9.5)
-                logger.LogWarning(ex, "Chromium のプロセスが終了していたため、起動し直します。");
+                // コンテキストを作れなかった。プロセスの終了の通知(Disconnected)がまだ届いていない場合もあるため、
+                // 接続の表示によらず、この Chromium を破棄して 1 回だけ起動し直す(要件9.5)
+                logger.LogWarning(ex, "ブラウザコンテキストを作れなかったため、Chromium を起動し直します。");
+                await InvalidateAsync(current).ConfigureAwait(false);
                 IBrowser relaunched = await GetBrowserAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
@@ -113,9 +118,22 @@ namespace Hanga.Rendering
                     throw new HangaBrowserException("Chromium を起動し直しましたが、ブラウザコンテキストを作れませんでした。", options.ChromiumExecutablePath, BrowserVersion, HangaStage.BrowserLaunch, retryEx);
                 }
             }
-            catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is HangaException))
+        }
+
+        /// <summary>使えなくなった Chromium を破棄する(既に別のスレッドが起動し直していれば何もしない)。</summary>
+        private async Task InvalidateAsync(IBrowser broken)
+        {
+            await launchLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                throw new HangaBrowserException("ブラウザコンテキストを作れませんでした。", options.ChromiumExecutablePath, BrowserVersion, HangaStage.BrowserLaunch, ex);
+                if (ReferenceEquals(browser, broken))
+                {
+                    await CloseBrowserAsync().ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                launchLock.Release();
             }
         }
 
@@ -162,7 +180,8 @@ namespace Hanga.Rendering
                 throw new HangaBrowserException("Chromium の実行ファイルが見つかりません。", path, null, HangaStage.BrowserLaunch);
             }
 
-            // プロセスごとの一時ユーザーデータフォルダ。終了時に削除する
+            // プロセスごとの一時ユーザーデータフォルダ。終了時に削除する。異常終了で残った古いものは、ここで片付ける
+            DeleteStaleUserDataDirs();
             userDataDir = Path.Combine(Path.GetTempPath(), "hanga-chromium-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(userDataDir);
             IBrowser? launched = null;
@@ -253,6 +272,25 @@ namespace Hanga.Rendering
             {
                 // Chromium の子プロセスがまだファイルを掴んでいる場合など。次回以降の動作には影響しない
                 logger.LogDebug(ex, "Chromium の一時ユーザーデータフォルダを削除できませんでした: {Dir}", dir);
+            }
+        }
+
+        /// <summary>前回までに異常終了などで残った一時ユーザーデータフォルダ(1 日以上前のもの)を削除する。</summary>
+        private void DeleteStaleUserDataDirs()
+        {
+            try
+            {
+                foreach (string dir in Directory.GetDirectories(Path.GetTempPath(), "hanga-chromium-*"))
+                {
+                    if (Directory.GetLastWriteTimeUtc(dir) < DateTime.UtcNow.AddDays(-1))
+                    {
+                        Directory.Delete(dir, recursive: true);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "古い一時ユーザーデータフォルダを削除できませんでした。");
             }
         }
 
