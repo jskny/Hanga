@@ -92,6 +92,48 @@ namespace Hanga.Tests
         }
 
         [Fact]
+        public async Task 外部への読み込みは遮断して警告し厳格な扱いではエラーにする()
+        {
+            // 要件3.6(中核機能の要件3.4, 3.6, 8.7)
+            HangaPdfDocument document = await new Cshtml2Pdf(batch, "Invoice", "External").GenerateAsync();
+            Assert.Contains(document.Warnings, w => w.Kind == HangaWarningKind.BlockedExternalRequest);
+
+            var strict = new Cshtml2Pdf(batch, "Invoice", "External");
+            strict.Options.Strict = true;
+            await Assert.ThrowsAsync<HangaStrictModeException>(() => strict.ToBytesAsync());
+        }
+
+        [Fact]
+        public async Task ストリームに書き込みChromiumを使い回す()
+        {
+            // 要件4.1, 5.1
+            int processId = batch.Services.GetRequiredService<BrowserHost>().CurrentBrowser!.Process!.Id;
+            using var stream = new MemoryStream();
+            await new Cshtml2Pdf(batch, "Invoice", "Invoice", HangaBatchFixture.Invoice("ストリーム")).WriteToAsync(stream);
+            Assert.Contains("宛名: ストリーム 様", PdfInspector.Read(stream.ToArray()).AllText);
+            Assert.Equal(processId, batch.Services.GetRequiredService<BrowserHost>().CurrentBrowser!.Process!.Id);
+        }
+
+        [Fact]
+        public void 帳票1件用の要求に認証情報を付けない()
+        {
+            // 要件2.4, 3.4
+            var request = batch.CreateRequest();
+            try
+            {
+                var snapshot = Hanga.Hosting.RequestSnapshot.From(request.HttpContext);
+                Assert.Empty(snapshot.Cookie);
+                Assert.Empty(snapshot.AcceptLanguage);
+                Assert.Equal("https", snapshot.Scheme);
+                Assert.Equal("hanga.invalid", snapshot.Host.Value);
+            }
+            finally
+            {
+                request.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+        }
+
+        [Fact]
         public async Task Chromiumが終了しても次の帳票は生成できる()
         {
             // 要件4.4(中核機能の要件9.5)
@@ -112,6 +154,14 @@ namespace Hanga.Tests
             cts.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 () => new Cshtml2Pdf(batch, "Invoice", "Invoice", HangaBatchFixture.Invoice("取り消し")).ToBytesAsync(cts.Token));
+
+            // 表示の完了を待っている途中(ブラウザコンテキストを使っている間)に取り消す
+            var waiting = new Cshtml2Pdf(batch, "Invoice", "Invoice", HangaBatchFixture.Invoice("待機中に取り消し"));
+            waiting.Options.ReadyExpression = "false";
+            using var during = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var stopwatch = Stopwatch.StartNew();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiting.ToBytesAsync(during.Token));
+            Assert.InRange(stopwatch.ElapsedMilliseconds, 0, 20_000); // 待機の上限(30秒)を待たずに中止する
 
             var after = PdfInspector.Read(await new Cshtml2Pdf(batch, "Invoice", "Invoice", HangaBatchFixture.Invoice("取り消しの後")).ToBytesAsync());
             Assert.Contains("宛名: 取り消しの後 様", after.AllText);
@@ -161,8 +211,10 @@ namespace Hanga.Tests
             string path = Path.Combine(dir.Path, "フォルダ.pdf");
             Directory.CreateDirectory(path);
 
-            await Assert.ThrowsAnyAsync<IOException>(
+            // Linux では IOException、Windows では UnauthorizedAccessException になる
+            var ex = await Assert.ThrowsAnyAsync<Exception>(
                 () => new Cshtml2Pdf(batch, "Invoice", "Invoice", HangaBatchFixture.Invoice("書き込み")).SaveAsync(path));
+            Assert.True(ex is IOException || ex is UnauthorizedAccessException, ex.GetType().FullName);
             Assert.Empty(Directory.GetFiles(dir.Path));
         }
 

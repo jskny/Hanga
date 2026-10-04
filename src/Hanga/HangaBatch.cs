@@ -59,8 +59,24 @@ namespace Hanga
 
             var batchOptions = new HangaBatchOptions();
             configure?.Invoke(batchOptions);
-            options.Validate();
-            batchOptions.Validate();
+            // アプリ全体の設定とバッチの設定の誤りを、まとめて 1 つの例外で知らせる
+            var errors = new System.Collections.Generic.List<string>();
+            foreach (Action validate in new Action[] { options.Validate, batchOptions.Validate })
+            {
+                try
+                {
+                    validate();
+                }
+                catch (HangaConfigurationException ex)
+                {
+                    errors.Add(ex.Message);
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                throw new HangaConfigurationException(string.Join(" ", errors));
+            }
 
             IHost host = BatchHostBuilder.Build(options, batchOptions);
             ILogger logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger<HangaBatch>();
@@ -110,7 +126,7 @@ namespace Hanga
             var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
             var origin = new Uri(options.NormalizedVirtualOrigin);
             context.Request.Scheme = origin.Scheme;
-            context.Request.Host = HostString.FromUriComponent(origin);
+            context.Request.Host = origin.IsDefaultPort ? new HostString(origin.Host) : new HostString(origin.Host, origin.Port);
             context.Request.Method = HttpMethods.Get;
 
             // タグヘルパーの URL の生成がエンドポイントルーティングの仕組みを使うようにする(検証レポート「6.4」)

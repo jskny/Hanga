@@ -40,7 +40,9 @@
 | `src/Hanga/` | `HangaBatchOptions` | 公開 | バッチ固有の設定(ビューのアセンブリ・静的ファイルのフォルダ・サービスの追加登録) |
 | `src/Hanga/` | `Cshtml2Pdf` | 公開(変更) | バッチ用のコンストラクターを加える。ファイルへの保存を一時ファイル経由にする |
 | `src/Hanga/Hosting/` | `BatchHostBuilder` | internal | Webサーバーを持たないホストの組み立て |
-| `src/Hanga/Hosting/` | `NoopServer` | internal | ポートを開かない `IServer` の実装 |
+| `src/Hanga/Hosting/`(`BatchHostBuilder.cs`) | `NoopServer` | internal | ポートを開かない `IServer` の実装 |
+| `src/Hanga/Hosting/`(`BatchHostBuilder.cs`) | `BatchHostLifetime` | internal | 何もしない `IHostLifetime`(既定の `ConsoleLifetime` の代わり) |
+| `src/Hanga/`(`HangaBatch.cs`) | `BatchRequest` | internal | 帳票1件用のスコープと `HttpContext`(非同期で破棄する) |
 | `src/Hanga/Hosting/` | `RequestSnapshot` | internal(変更なし) | バッチでも、帳票1件用の `HttpContext` から既存の `From` で写し取る |
 
 - `Hanga.Core`・`Hanga.Templating`・`Hanga.Rendering` は変更しない。
@@ -123,7 +125,7 @@ foreach (var customer in customers)
 
 検証コード(`spikes/batch-rcl-verification/`)と同じ手順で、汎用ホスト(`HostBuilder`)に Web のホストを組み込む。
 
-1. `UseContentRoot(ContentRootPath)`、`WebRootPath` を指定した場合は `UseWebRoot`。
+1. `UseContentRoot(ContentRootPath)`、`UseWebRoot(WebRootPath。未指定なら wwwroot)`、環境名(`Production`)を、Webのホストに明示する(下記の環境変数の扱い)。
 2. `UseStaticWebAssets()` を常に呼ぶ。開発中の実行(ビルドの出力)では `<バッチ名>.StaticWebAssets.xml` に従って帳票ライブラリの `wwwroot` を `/_content/<ライブラリ名>/` に重ねる。
    発行したバッチにはこの一覧が無く、何もしない(発行先の `wwwroot/_content/` から応答する)。
 3. `UseServer(new NoopServer())`: ポートを開かない(要件1.1)。ホストの起動でルーティングなどの初期化だけが行われる。
@@ -226,7 +228,10 @@ Hanga は失敗の方針を持たず、帳票1件ごとに中核機能の例外(
   - `SaveAsync`: 失敗・取り消しで保存先にファイルができず、既存のファイルが壊れず、一時ファイルが残らないこと
   - 設定の誤り(フォルダが無い、Chromium が無い)が `StartAsync` で例外になること、終了後の利用が `ObjectDisposedException` になること
   - 処理時間(1件ずつ・並行)の計測
-- 開発中の実行(静的Webアセットの一覧)と発行したバッチの動作は、検証コードで .NET 5 のランタイムで確かめた(テストでは扱わない)。
+  - 外部への読み込みの遮断と厳格な扱い、ストリームへの書き込み、Chromium の使い回し、表示の待機中の取り消し、一時ユーザーデータフォルダの削除
+  - コントローラーのアクションを実行させないこと(既定の経路・属性の経路の URL は生成できること)、帳票1件用の要求のスキーム・ホストと認証情報が無いこと
+- 開発中の実行(静的Webアセットの一覧)、発行したバッチの動作、`ViewAssemblies` を指定しない場合の自動のビューの発見は、
+  検証コードで .NET 5 のランタイムで確かめた(テストは testhost の下で動き、エントリのアセンブリがバッチと異なるため扱わない)。
 
 ## 検証結果(設計の根拠)
 

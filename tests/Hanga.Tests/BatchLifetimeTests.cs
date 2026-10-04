@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Hanga.Rendering;
 using Hanga.TestReports;
 using Hanga.TestSupport;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Xunit.Abstractions;
@@ -48,12 +49,16 @@ namespace Hanga.Tests
             // 要件1.4
             var batch = await HangaBatch.StartAsync(HangaBatchFixture.NewOptions(), HangaBatchFixture.ConfigureTestReports);
             var pdf = new Cshtml2Pdf(batch, "Invoice", "Invoice", HangaBatchFixture.Invoice("終了"));
-            Process process = batch.Services.GetRequiredService<BrowserHost>().CurrentBrowser!.Process!;
+            var browserHost = batch.Services.GetRequiredService<BrowserHost>();
+            Process process = browserHost.CurrentBrowser!.Process!;
+            string userDataDir = (string)typeof(BrowserHost).GetField("userDataDir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(browserHost)!;
+            Assert.True(Directory.Exists(userDataDir));
 
             await batch.DisposeAsync();
             await batch.DisposeAsync(); // 2 回目は何もしない
 
             Assert.True(process.WaitForExit(10_000));
+            Assert.False(Directory.Exists(userDataDir)); // 一時ユーザーデータフォルダも削除する
             await Assert.ThrowsAsync<ObjectDisposedException>(() => pdf.ToBytesAsync());
             Assert.Throws<ObjectDisposedException>(() => new Cshtml2Pdf(batch, "Invoice", "Invoice"));
         }
@@ -99,7 +104,10 @@ namespace Hanga.Tests
             await using var batch = await HangaBatch.StartAsync(HangaBatchFixture.NewOptions(), HangaBatchFixture.ConfigureTestReports);
 
             string text = PdfInspector.Read(await new Cshtml2Pdf(batch, "Invoice", "Links").ToBytesAsync()).AllText;
-            Assert.Contains("リンク: /Probe/Run", text);
+            Assert.Contains("リンク: /Probe/Run", text);              // 既定の経路
+            Assert.Contains("属性の経路: /routed/probe/run", text);   // 属性で指定した経路
+            Assert.Contains("要求: https://hanga.invalid", text);
+            Assert.DoesNotContain("hanga.invalid:", text);     // 要件2.4: スキームとホストは仮想オリジン
 
             var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
             context.Request.Method = "GET";
@@ -142,6 +150,42 @@ namespace Hanga.Tests
             Assert.Contains("WebRootPath", ex.Message);
             Assert.Contains("/ で始めて", ex.Message);
             Assert.Contains("no-such-folder", ex.Message);
+        }
+
+        [Fact]
+        public async Task アプリ全体の設定とバッチの設定の誤りをまとめて知らせる()
+        {
+            // design.md「バッチ固有の設定」: すべての誤りを含めて 1 つの例外にする
+            using var dir = new BatchTests.TemporaryDirectory();
+            var ex = await Assert.ThrowsAsync<HangaConfigurationException>(() => HangaBatch.StartAsync(new HangaOptions(), b =>
+            {
+                b.ContentRootPath = Path.Combine(dir.Path, "no-such-root");
+                b.ViewAssemblies.Add(null!);
+            }));
+            Assert.Contains("ChromiumExecutablePath", ex.Message);
+            Assert.Contains("ContentRootPath", ex.Message);
+            Assert.Contains("ViewAssemblies に null", ex.Message);
+        }
+
+        [Fact]
+        public void 設定ファイルの値を読んで使える()
+        {
+            // 要件1.2: Web アプリと同じ HangaOptions を設定ファイルの節から読む
+            var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+                .AddInMemoryCollection(new System.Collections.Generic.Dictionary<string, string>
+                {
+                    ["Hanga:ChromiumExecutablePath"] = "/opt/chrome",
+                    ["Hanga:MaxConcurrentRenders"] = "8",
+                    ["Hanga:RenderTimeout"] = "00:01:00",
+                })
+                .Build();
+            var options = new HangaOptions();
+            Microsoft.Extensions.Configuration.ConfigurationBinder.Bind(configuration.GetSection("Hanga"), options);
+
+            Assert.Equal("/opt/chrome", options.ChromiumExecutablePath);
+            Assert.Equal(8, options.MaxConcurrentRenders);
+            Assert.Equal(TimeSpan.FromMinutes(1), options.RenderTimeout);
+            options.Validate();
         }
 
         [Fact]
